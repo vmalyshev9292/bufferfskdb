@@ -1,11 +1,9 @@
-# buffer_server.py
 from flask import Flask, request, jsonify
 import uuid
 import time
 
 app = Flask(__name__)
 
-# Хранилище анкет (в памяти)
 anketas = {}
 
 @app.route('/api/anketa', methods=['POST'])
@@ -21,7 +19,6 @@ def submit_anketa():
 
 @app.route('/api/anketa', methods=['GET'])
 def get_anketas():
-    # Возвращаем все анкеты
     return jsonify(list(anketas.values()))
 
 @app.route('/api/anketa/<anketa_id>', methods=['DELETE'])
