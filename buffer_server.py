@@ -6,6 +6,19 @@ app = Flask(__name__)
 
 anketas = {}
 
+# === ДОБАВЛЯЕМ CORS (чтобы запросы с других сайтов работали) ===
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+    response.headers.add('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
+    return response
+
+@app.route('/api/anketa', methods=['OPTIONS'])
+def options_anketa():
+    return '', 200
+
+# === ОСНОВНЫЕ МАРШРУТЫ ===
 @app.route('/api/anketa', methods=['POST'])
 def submit_anketa():
     data = request.get_json()
@@ -30,3 +43,4 @@ def delete_anketa(anketa_id):
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
+    
