@@ -21,13 +21,25 @@ def options_anketa():
 # === ОСНОВНЫЕ МАРШРУТЫ ===
 @app.route('/api/anketa', methods=['POST'])
 def submit_anketa():
-    data = request.get_json()
+    # Определяем тип содержимого
+    content_type = request.headers.get('Content-Type', '')
+    
+    if 'application/json' in content_type:
+        data = request.get_json()
+    else:
+        # Обычная форма (application/x-www-form-urlencoded) или multipart/form-data
+        data = request.form.to_dict()
+        # Если есть файлы, они игнорируются (нам не нужны)
+
     if not data:
         return jsonify({'error': 'Нет данных'}), 400
+
+    # Генерируем уникальный ID и добавляем метку времени
     anketa_id = str(uuid.uuid4())
     data['id'] = anketa_id
     data['timestamp'] = time.time()
     anketas[anketa_id] = data
+    
     return jsonify({'status': 'ok', 'id': anketa_id}), 201
 
 @app.route('/api/anketa', methods=['GET'])
