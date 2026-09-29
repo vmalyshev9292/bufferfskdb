@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify, send_from_directory
 import uuid
 import time
 import os
-from datetime import datetime   # <-- ДОБАВЛЕНО
+from datetime import datetime, timezone, timedelta
 
 app = Flask(__name__)
 
@@ -33,16 +33,25 @@ def submit_anketa():
     if not data:
         return jsonify({'error': 'Нет данных'}), 400
 
-    # ===== НОВЫЙ БЛОК: получаем IP и время =====
+    # ===== БЛОК: IP, User-Agent, время (152-ФЗ) =====
+    # IP: сначала X-Real-IP (если перед буфером nginx), потом X-Forwarded-For, потом remote_addr
     client_ip = request.remote_addr
-    # Если запрос идёт через прокси (nginx, cloudflare), берём реальный IP из заголовка
-    if request.headers.get('X-Forwarded-For'):
+    if request.headers.get('X-Real-IP'):
+        client_ip = request.headers.get('X-Real-IP').strip()
+    elif request.headers.get('X-Forwarded-For'):
         client_ip = request.headers.get('X-Forwarded-For').split(',')[0].strip()
-    received_at = datetime.now().isoformat()
-    # Добавляем в данные анкеты
+
+    # User-Agent (браузер + ОС), обрезаем до 500 символов
+    user_agent = request.headers.get('User-Agent', '')[:500]
+
+    # Время получения — МСК (UTC+3), с явной таймзоной
+    msk = timezone(timedelta(hours=3))
+    received_at = datetime.now(msk).isoformat(timespec="seconds")
+
     data['client_ip'] = client_ip
+    data['user_agent'] = user_agent
     data['received_at'] = received_at
-    # ===== КОНЕЦ НОВОГО БЛОКА =====
+    # ===== КОНЕЦ БЛОКА =====
 
     file_infos = []
     if files:
@@ -105,4 +114,3 @@ anketas = {}
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
-    
