@@ -793,7 +793,20 @@ async function decryptPayload(encryptedB64, ivB64, keyB64) {
   var plainBuf = await crypto.subtle.decrypt(
     { name: 'AES-GCM', iv: iv }, aesKey, ct
   );
-  return new TextDecoder().decode(plainBuf);
+  // Возвращаем ArrayBuffer, НЕ строку — важно для gzip
+  return plainBuf;
+}
+
+async function parseMaybeGzip(buf) {
+  var bytes = new Uint8Array(buf);
+  if (bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b) {
+    var ds = new DecompressionStream('gzip');
+    var stream = new Blob([bytes]).stream().pipeThrough(ds);
+    var text = await new Response(stream).text();
+    return JSON.parse(text);
+  }
+  var text2 = new TextDecoder().decode(bytes);
+  return JSON.parse(text2);
 }
 
 async function encryptFileBlob(file, aesKey) {
@@ -1411,13 +1424,14 @@ async function loadPrefill() {
   var d = getHashParam('d');
 
   if (!k || !i || !d) {
-    // Нет prefill — это первичная отправка, форма пустая. Всё ок.
+    // Нет prefill — первичная отправка, пустая форма. Ок.
     return;
   }
 
   try {
     var plainJson = await decryptPayload(d, i, k);
-    var payload = JSON.parse(plainJson);
+    // plainJson может быть gzip-сжатым — пробуем распаковать
+    var payload = await parseMaybeGzip(plainJson);
     fillAnketa(payload);
     if (payload._remarks) showRemarks(payload._remarks);
   } catch (e) {
