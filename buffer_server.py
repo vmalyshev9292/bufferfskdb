@@ -16,11 +16,33 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(PREFILL_FOLDER, exist_ok=True)
 os.makedirs(STATIC_FOLDER, exist_ok=True)
 
-# Хранилище анкет (в оперативной памяти)
+# API-токен для защиты служебных эндпоинтов
+BUFFER_API_TOKEN = os.environ.get(
+    'BUFFER_API_TOKEN',
+    'caoXLvI1fGleTDN32_l5AQn2TUf6faa7NiyP8DBSzd-XswZAfbknFbbH1ccP-Uu0',
+)
+
+# Хранилище анкет
 anketas = {}
 
 
-# === CORS ===
+# ============================================================
+# АВТОРИЗАЦИЯ
+# ============================================================
+def _check_token():
+    """Проверяет Bearer-токен. Возвращает (ok, error_response)."""
+    auth = request.headers.get('Authorization', '') or ''
+    if not auth.startswith('Bearer '):
+        return False, (jsonify({'error': 'Unauthorized'}), 401)
+    token = auth[7:].strip()
+    if token != BUFFER_API_TOKEN:
+        return False, (jsonify({'error': 'Unauthorized'}), 401)
+    return True, None
+
+
+# ============================================================
+# CORS
+# ============================================================
 @app.after_request
 def after_request(response):
     response.headers.add('Access-Control-Allow-Origin', '*')
@@ -40,7 +62,7 @@ def options_prefill():
 
 
 # ============================================================
-# ПРОВЕРКА ЖИЗНИ + РАЗДАЧА HTML
+# ПУБЛИЧНЫЕ ЭНДПОИНТЫ
 # ============================================================
 @app.route('/', methods=['GET'])
 def root():
@@ -53,15 +75,14 @@ def anketa_html():
 
 
 # ============================================================
-# PREFILL — данные для подстановки в форму (rework)
+# PREFILL — защищён Bearer
 # ============================================================
 @app.route('/api/anketa/prefill', methods=['POST'])
 def save_prefill():
-    """
-    Принимает {token, encrypted, iv} (все — строки base64).
-    Сохраняет на диск под именем <token>.json.
-    Ключ шифрования сюда НЕ попадает — он в URL-фрагменте #k=... у соискателя.
-    """
+    ok, err = _check_token()
+    if not ok:
+        return err
+
     try:
         payload = request.get_json(force=True)
     except Exception:
@@ -96,10 +117,9 @@ def save_prefill():
 
 @app.route('/api/anketa/prefill', methods=['GET'])
 def get_prefill():
-    """
-    GET /api/anketa/prefill?token=XXX
-    Возвращает {token, encrypted, iv} или 404.
-    """
+    # ВАЖНО: этот эндпоинт вызывается из браузера соискателя через fetch.
+    # Значит, он должен быть ПУБЛИЧНЫМ. Токен соискателя — это и есть
+    # его ключ доступа. Проверять Bearer здесь нельзя.
     token = (request.args.get('token') or '').strip()
     if not token:
         return jsonify({'error': 'Missing token'}), 400
@@ -117,7 +137,7 @@ def get_prefill():
 
 
 # ============================================================
-# ПРИЁМ АНКЕТЫ (как было)
+# ПРИЁМ АНКЕТЫ — публичный (соискатель)
 # ============================================================
 @app.route('/api/anketa', methods=['POST'])
 def submit_anketa():
@@ -127,7 +147,6 @@ def submit_anketa():
     if not data:
         return jsonify({'error': 'Нет данных'}), 400
 
-    # ===== БЛОК: IP, User-Agent, время (152-ФЗ) =====
     client_ip = request.remote_addr
     if request.headers.get('X-Real-IP'):
         client_ip = request.headers.get('X-Real-IP').strip()
@@ -141,7 +160,6 @@ def submit_anketa():
     data['client_ip'] = client_ip
     data['user_agent'] = user_agent
     data['received_at'] = received_at
-    # ===== КОНЕЦ БЛОКА =====
 
     file_infos = []
     if files:
@@ -169,15 +187,22 @@ def submit_anketa():
 
 
 # ============================================================
-# ПОЛУЧЕНИЕ СПИСКА И УДАЛЕНИЕ (как было)
+# СПИСОК АНКЕТ — защищён Bearer
 # ============================================================
 @app.route('/api/anketa', methods=['GET'])
 def get_anketas():
+    ok, err = _check_token()
+    if not ok:
+        return err
     return jsonify(list(anketas.values()))
 
 
 @app.route('/api/anketa/<anketa_id>', methods=['DELETE'])
 def delete_anketa(anketa_id):
+    ok, err = _check_token()
+    if not ok:
+        return err
+
     if anketa_id in anketas:
         files = anketas[anketa_id].get('files', [])
         for f in files:
@@ -192,10 +217,14 @@ def delete_anketa(anketa_id):
 
 
 # ============================================================
-# СКАЧИВАНИЕ ФАЙЛА (как было)
+# СКАЧИВАНИЕ ФАЙЛА — защищён Bearer
 # ============================================================
 @app.route('/api/files/<filename>', methods=['GET'])
 def get_file(filename):
+    ok, err = _check_token()
+    if not ok:
+        return err
+
     filepath = os.path.join(UPLOAD_FOLDER, filename)
     if os.path.exists(filepath):
         return send_from_directory(UPLOAD_FOLDER, filename)
