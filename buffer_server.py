@@ -2,49 +2,139 @@ from flask import Flask, request, jsonify, send_from_directory
 import uuid
 import time
 import os
+import json
 from datetime import datetime, timezone, timedelta
 
 app = Flask(__name__)
 
-# Папка для загрузки файлов
+# Папки
 UPLOAD_FOLDER = 'uploads'
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+PREFILL_FOLDER = 'prefill_data'
+STATIC_FOLDER = 'static'
 
-# === CORS (разрешаем запросы с любых сайтов) ===
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(PREFILL_FOLDER, exist_ok=True)
+os.makedirs(STATIC_FOLDER, exist_ok=True)
+
+# Хранилище анкет (в оперативной памяти)
+anketas = {}
+
+
+# === CORS ===
 @app.after_request
 def after_request(response):
     response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
     response.headers.add('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
     return response
+
 
 @app.route('/api/anketa', methods=['OPTIONS'])
 def options_anketa():
     return '', 200
 
-# === ПРИЁМ АНКЕТЫ (ТЕКСТ + ФАЙЛЫ) ===
+
+@app.route('/api/anketa/prefill', methods=['OPTIONS'])
+def options_prefill():
+    return '', 200
+
+
+# ============================================================
+# ПРОВЕРКА ЖИЗНИ + РАЗДАЧА HTML
+# ============================================================
+@app.route('/', methods=['GET'])
+def root():
+    return jsonify({'status': 'ok', 'service': 'bufferfskdb'})
+
+
+@app.route('/anketa.html', methods=['GET'])
+def anketa_html():
+    return send_from_directory(STATIC_FOLDER, 'anketa.html')
+
+
+# ============================================================
+# PREFILL — данные для подстановки в форму (rework)
+# ============================================================
+@app.route('/api/anketa/prefill', methods=['POST'])
+def save_prefill():
+    """
+    Принимает {token, encrypted, iv} (все — строки base64).
+    Сохраняет на диск под именем <token>.json.
+    Ключ шифрования сюда НЕ попадает — он в URL-фрагменте #k=... у соискателя.
+    """
+    try:
+        payload = request.get_json(force=True)
+    except Exception:
+        return jsonify({'error': 'Invalid JSON'}), 400
+
+    token = (payload.get('token') or '').strip()
+    encrypted = payload.get('encrypted') or ''
+    iv = payload.get('iv') or ''
+
+    if not token or not encrypted or not iv:
+        return jsonify({'error': 'Missing fields'}), 400
+
+    safe_token = ''.join(c for c in token if c.isalnum() or c in '-_')
+    if len(safe_token) < 10:
+        return jsonify({'error': 'Invalid token'}), 400
+
+    record = {
+        'token': token,
+        'encrypted': encrypted,
+        'iv': iv,
+        'received_at': datetime.now(
+            timezone(timedelta(hours=3))
+        ).isoformat(timespec='seconds'),
+    }
+
+    path = os.path.join(PREFILL_FOLDER, f'{safe_token}.json')
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(record, f, ensure_ascii=False)
+
+    return jsonify({'status': 'ok', 'token': token}), 200
+
+
+@app.route('/api/anketa/prefill', methods=['GET'])
+def get_prefill():
+    """
+    GET /api/anketa/prefill?token=XXX
+    Возвращает {token, encrypted, iv} или 404.
+    """
+    token = (request.args.get('token') or '').strip()
+    if not token:
+        return jsonify({'error': 'Missing token'}), 400
+
+    safe_token = ''.join(c for c in token if c.isalnum() or c in '-_')
+    path = os.path.join(PREFILL_FOLDER, f'{safe_token}.json')
+
+    if not os.path.exists(path):
+        return jsonify({'error': 'Not found'}), 404
+
+    with open(path, 'r', encoding='utf-8') as f:
+        record = json.load(f)
+
+    return jsonify(record), 200
+
+
+# ============================================================
+# ПРИЁМ АНКЕТЫ (как было)
+# ============================================================
 @app.route('/api/anketa', methods=['POST'])
 def submit_anketa():
-    # Берём текстовые поля
     data = request.form.to_dict()
-    # Берём все загруженные файлы
     files = request.files.getlist('files')
 
     if not data:
         return jsonify({'error': 'Нет данных'}), 400
 
     # ===== БЛОК: IP, User-Agent, время (152-ФЗ) =====
-    # IP: сначала X-Real-IP (если перед буфером nginx), потом X-Forwarded-For, потом remote_addr
     client_ip = request.remote_addr
     if request.headers.get('X-Real-IP'):
         client_ip = request.headers.get('X-Real-IP').strip()
     elif request.headers.get('X-Forwarded-For'):
         client_ip = request.headers.get('X-Forwarded-For').split(',')[0].strip()
 
-    # User-Agent (браузер + ОС), обрезаем до 500 символов
     user_agent = request.headers.get('User-Agent', '')[:500]
-
-    # Время получения — МСК (UTC+3), с явной таймзоной
     msk = timezone(timedelta(hours=3))
     received_at = datetime.now(msk).isoformat(timespec="seconds")
 
@@ -58,7 +148,6 @@ def submit_anketa():
         for file in files:
             if file.filename == '':
                 continue
-            # Сохраняем файл с новым уникальным именем
             ext = os.path.splitext(file.filename)[1]
             new_filename = f"{uuid.uuid4()}{ext}"
             filepath = os.path.join(UPLOAD_FOLDER, new_filename)
@@ -69,27 +158,27 @@ def submit_anketa():
                 'size': os.path.getsize(filepath)
             })
 
-    # Генерируем ID анкеты
     anketa_id = str(uuid.uuid4())
     data['id'] = anketa_id
     data['timestamp'] = time.time()
     data['files'] = file_infos
 
-    # Сохраняем в словарь (в памяти)
     anketas[anketa_id] = data
 
     return jsonify({'status': 'ok', 'id': anketa_id}), 201
 
-# === ПОЛУЧЕНИЕ СПИСКА ВСЕХ АНКЕТ ===
+
+# ============================================================
+# ПОЛУЧЕНИЕ СПИСКА И УДАЛЕНИЕ (как было)
+# ============================================================
 @app.route('/api/anketa', methods=['GET'])
 def get_anketas():
     return jsonify(list(anketas.values()))
 
-# === УДАЛЕНИЕ АНКЕТЫ (И ФАЙЛОВ) ===
+
 @app.route('/api/anketa/<anketa_id>', methods=['DELETE'])
 def delete_anketa(anketa_id):
     if anketa_id in anketas:
-        # Удаляем файлы
         files = anketas[anketa_id].get('files', [])
         for f in files:
             saved_name = f.get('saved_name')
@@ -101,7 +190,10 @@ def delete_anketa(anketa_id):
         return jsonify({'status': 'ok'}), 200
     return jsonify({'error': 'Не найдено'}), 404
 
-# === СКАЧИВАНИЕ ФАЙЛА ПО ИМЕНИ ===
+
+# ============================================================
+# СКАЧИВАНИЕ ФАЙЛА (как было)
+# ============================================================
 @app.route('/api/files/<filename>', methods=['GET'])
 def get_file(filename):
     filepath = os.path.join(UPLOAD_FOLDER, filename)
@@ -109,8 +201,6 @@ def get_file(filename):
         return send_from_directory(UPLOAD_FOLDER, filename)
     return jsonify({'error': 'File not found'}), 404
 
-# Хранилище анкет (в оперативной памяти)
-anketas = {}
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=False)
