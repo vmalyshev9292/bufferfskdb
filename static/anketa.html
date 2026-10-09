@@ -1,0 +1,1485 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Анкета соискателя · ФСК</title>
+<!-- Данные больше не вшиваются. Всё через prefill API. -->
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', 'Roboto', system-ui, sans-serif; }
+  body { background: #f8fafc; padding: 30px 16px; }
+  .card { max-width: 1200px; margin: 0 auto; background: #fff; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); border: 1px solid #e6e9ef; overflow: hidden; }
+  .header { padding: 20px 30px; border-bottom: 1px solid #e0e4ec; display: flex; align-items: center; gap: 30px; background: #fff; }
+  .header img { height: 130px; }
+  .header h1 { font-size: 30px; font-weight: 500; color: #2a2f3c; border-left: 3px solid #ff8c42; padding-left: 20px; margin: 0; }
+  form { padding: 30px 32px 45px; }
+  fieldset { border: none; margin-bottom: 40px; padding: 0; }
+  legend { font-size: 22px; font-weight: 600; color: #1e1e2a; margin-bottom: 18px; border-bottom: 2px solid #ff8c42; padding-bottom: 10px; width: 100%; text-transform: uppercase; }
+  .desc { font-size: 15px; color: #2d3442; margin-bottom: 12px; font-weight: 500; background: #f5f7fa; padding: 10px 16px; border-radius: 8px; border-left: 4px solid #ff8c42; }
+  input[type="text"], input[type="email"], input:not([type]), textarea, select { width: 100%; padding: 12px 14px; border: 1px solid #d4dae5; border-radius: 8px; font-size: 15px; background: #fff; transition: 0.15s; font-family: inherit; }
+  input[type="text"]:focus, input[type="email"]:focus, input:not([type]):focus, textarea:focus, select:focus { border-color: #ff8c42; outline: none; box-shadow: 0 0 0 4px rgba(255,140,66,0.15); }
+  textarea { resize: vertical; min-height: 44px; }
+  .row { display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 20px; }
+  .col { flex: 1 1 220px; min-width: 200px; }
+  .col.wide { flex: 1 1 100%; }
+  label { display: block; margin-bottom: 8px; font-weight: 500; font-size: 14px; color: #2d3442; }
+  .req { color: #ff8c42; margin-left: 3px; font-size: 16px; }
+
+  /* ===== КРАСИВЫЕ РАДИО-КНОПКИ ===== */
+  .radio-group { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; padding: 4px 0; }
+  .radio-group label {
+    display: inline-flex; align-items: center; gap: 10px;
+    font-weight: 500; font-size: 15px; color: #2d3442;
+    cursor: pointer; margin: 0; padding: 8px 4px; transition: 0.15s;
+  }
+  .radio-group label:hover { color: #ff8c42; }
+  .radio-group input[type="radio"] {
+    appearance: none; -webkit-appearance: none; -moz-appearance: none;
+    width: 22px; height: 22px; border: 2px solid #b0b8c5; border-radius: 50%;
+    background: #fff; margin: 0; cursor: pointer; position: relative;
+    flex-shrink: 0; transition: 0.15s;
+  }
+  .radio-group input[type="radio"]:hover { border-color: #ff8c42; }
+  .radio-group input[type="radio"]:checked { border-color: #ff8c42; background: #fff; }
+  .radio-group input[type="radio"]:checked::after {
+    content: ''; position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%); width: 11px; height: 11px;
+    border-radius: 50%; background: #ff8c42;
+  }
+
+  /* ===== КРАСИВЫЕ ЧЕКБОКСЫ ===== */
+  .checkbox-inline { display: flex; align-items: center; gap: 12px; font-weight: 600; margin: 10px 0; font-size: 15px; color: #2d3442; cursor: pointer; }
+  .checkbox-inline input[type="checkbox"], .consent-box input[type="checkbox"] {
+    appearance: none; -webkit-appearance: none;
+    width: 22px; height: 22px; border: 2px solid #b0b8c5; border-radius: 5px;
+    background: #fff; cursor: pointer; position: relative;
+    flex-shrink: 0; transition: 0.15s; margin: 0;
+  }
+  .checkbox-inline input[type="checkbox"]:hover, .consent-box input[type="checkbox"]:hover { border-color: #ff8c42; }
+  .checkbox-inline input[type="checkbox"]:checked, .consent-box input[type="checkbox"]:checked {
+    border-color: #ff8c42; background: #ff8c42;
+  }
+  .checkbox-inline input[type="checkbox"]:checked::after, .consent-box input[type="checkbox"]:checked::after {
+    content: '✓'; position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -55%); color: #fff; font-size: 15px; font-weight: 900; line-height: 1;
+  }
+
+  .table-wrap { overflow-x: auto; margin: 10px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; border: 1px solid #e0e4ec; border-radius: 8px; overflow: hidden; }
+  th { background: #f0f3f8; text-align: left; font-weight: 600; font-size: 13px; color: #1e262f; padding: 10px 8px; border-bottom: 1px solid #d0d8e5; }
+  td { padding: 6px 6px; border-bottom: 1px solid #eaeef3; vertical-align: top; }
+  td input, td textarea { padding: 8px 10px; font-size: 14px; }
+  .del-btn { background: none; border: none; color: #999; font-size: 18px; cursor: pointer; padding: 6px 10px; border-radius: 4px; }
+  .del-btn:hover { color: #dc3545; background: #fee; }
+  .add-row { background: #f0f0f0; border: 1px solid #d0d0d0; border-radius: 8px; padding: 9px 20px; font-size: 14px; font-weight: 500; cursor: pointer; margin: 8px 0; }
+  .add-row:hover { background: #e0e0e0; }
+  .hidden-block { display: none; margin-top: 16px; padding: 18px; background: #f9fafd; border-radius: 8px; border: 1px solid #dde2ec; }
+  .hidden-block.visible { display: block; }
+  .field-error { border-color: #dc3545 !important; background: #fff8f8; }
+  .files-list { margin-top: 12px; }
+  .file-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #f5f7fa; border: 1px solid #e0e4ec; border-radius: 8px; margin-bottom: 6px; }
+  .file-item button { background: none; border: none; color: #dc3545; cursor: pointer; font-size: 18px; }
+
+  /* ===== КРУПНАЯ КНОПКА ДОБАВИТЬ ФАЙЛЫ ===== */
+  .upload-btn-large {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: #ff8c42; color: #fff;
+    border: 1px solid #e07a33; border-radius: 8px;
+    padding: 14px 32px; font-size: 16px; font-weight: 600;
+    cursor: pointer; transition: 0.15s; margin: 12px 0;
+    box-shadow: 0 2px 6px rgba(255,140,66,0.2);
+  }
+  .upload-btn-large:hover { background: #e07a33; border-color: #c96a28; }
+  .upload-btn-large:active { transform: translateY(1px); }
+
+  .consent-box { background: #f9fafd; border: 1px solid #d7dee9; border-radius: 8px; padding: 20px 28px; margin: 30px 0; cursor: pointer; transition: 0.15s; }
+  .consent-box:hover { border-color: #ff8c42; background: #fff8f2; }
+  .consent-box label { display: flex; align-items: center; gap: 16px; font-weight: 500; font-size: 16px; cursor: pointer; margin: 0; }
+  .consent-link { color: #0066cc; text-decoration: underline dotted; cursor: pointer; }
+  .submit-row { text-align: center; margin: 40px 0 10px; }
+  .submit-btn { background: #f0f0f0; border: 1px solid #d0d0d0; color: #333; font-weight: 600; font-size: 22px; letter-spacing: 1.5px; padding: 16px 60px; border-radius: 8px; cursor: pointer; transition: 0.2s; }
+  .submit-btn:hover:not(:disabled) { background: #ffa64d; border-color: #e68a2e; }
+  .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  .status { margin: 20px 32px; padding: 18px 22px; border-radius: 8px; }
+  .status.info { background: #e7f1ff; color: #0d47a1; border-left: 4px solid #0d47a1; }
+  .status.error { background: #fdecea; color: #b33; border-left: 4px solid #dc3545; }
+  .status.success { background: #e8f5e9; color: #1e5a2b; border-left: 4px solid #2e7d32; }
+  .status.hidden { display: none; }
+  .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000; }
+  .modal.open { display: flex; }
+  .modal-content { background: #fff; max-width: 800px; max-height: 80vh; overflow-y: auto; padding: 40px; border-radius: 16px; box-shadow: 0 30px 40px rgba(0,0,0,0.2); margin: 20px; }
+  .modal-content h2 { text-align: center; font-size: 22px; font-weight: 600; margin-bottom: 20px; color: #1e1e2a; }
+  .modal-content p { margin-bottom: 14px; line-height: 1.6; font-size: 15px; color: #1e1e2a; text-align: justify; }
+  .modal-content ul { margin-bottom: 14px; padding-left: 22px; }
+  .modal-content li { margin-bottom: 4px; line-height: 1.5; }
+  .modal-btn { background: #ff8c42; border: none; color: #fff; padding: 14px 30px; border-radius: 8px; font-weight: 600; font-size: 16px; cursor: pointer; width: 100%; margin-top: 20px; transition: 0.15s; }
+  .modal-btn:hover { background: #e07a33; }
+
+  /* ===== БАННЕР ЗАМЕЧАНИЙ ===== */
+  .remarks-banner {
+    display: none;
+    margin: 20px 32px;
+    padding: 18px 24px;
+    background: #fdecea;
+    border: 1px solid #f5c6cb;
+    border-left: 6px solid #dc3545;
+    border-radius: 8px;
+    color: #721c24;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  .remarks-banner.visible { display: block; }
+  .remarks-banner strong { display: block; margin-bottom: 8px; font-size: 16px; }
+  .remarks-banner .remarks-text {
+    white-space: pre-wrap;
+    background: rgba(255,255,255,0.5);
+    padding: 10px 14px;
+    border-radius: 6px;
+    margin-top: 6px;
+    color: #721c24;
+  }
+
+  /* ===== БАННЕР "ПОЛУЧИТЬ ССЫЛКУ ЗАНОВО" ===== */
+  .prefill-missing {
+    display: none;
+    margin: 20px 32px;
+    padding: 18px 24px;
+    background: #fff8e1;
+    border: 1px solid #ffe082;
+    border-left: 6px solid #f9a825;
+    border-radius: 8px;
+    color: #7a5c00;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  .prefill-missing.visible { display: block; }
+  .prefill-missing strong { display: block; margin-bottom: 8px; font-size: 16px; }
+  .prefill-missing button {
+    background: #f9a825; color: #fff; border: none;
+    padding: 10px 22px; border-radius: 6px; font-weight: 600;
+    cursor: pointer; margin-top: 10px; font-size: 14px;
+  }
+  .prefill-missing button:hover { background: #e8981b; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQRXBPKX9rzKRZg-i9vKktR57YtDASrTsq_loQBeHPvVg&s" alt="ФСК">
+    <h1>АНКЕТА СОИСКАТЕЛЯ</h1>
+  </div>
+
+  <!-- БАННЕР ЗАМЕЧАНИЙ (показывается, если есть _remarks) -->
+  <div id="remarksBanner" class="remarks-banner">
+    <strong>⚠️ Замечания по вашей анкете:</strong>
+    <div class="remarks-text" id="remarksText"></div>
+  </div>
+
+  <!-- БАННЕР "ССЫЛКА ПОВРЕЖДЕНА" (показывается, если prefill не удалось) -->
+  <div id="prefillMissingBanner" class="prefill-missing">
+    <strong>📭 Прежние данные не найдены</strong>
+    Не удалось автоматически подставить ваши прежние ответы. Вы можете заполнить анкету заново или запросить ссылку ещё раз — она придёт на вашу почту.
+    <div><button type="button" id="resendLinkBtn">Запросить ссылку заново</button></div>
+  </div>
+
+  <div id="status" class="status hidden"></div>
+
+  <form id="anketaForm">
+    <input type="hidden" id="candidateId" value="">
+
+    <!-- ============ 1. ЛИЧНЫЕ ДАННЫЕ ============ -->
+    <fieldset>
+      <legend>1. Личные данные</legend>
+
+      <div class="row">
+        <div class="col wide">
+          <label>ФИО <span class="req">*</span></label>
+          <input id="fio" required placeholder="Иванов Иван Иванович">
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col wide">
+          <label>Паспортные данные <span class="req">*</span></label>
+          <input id="passportData" required placeholder="0000 000000, выдан 01.01.2025 УФМС России по г. Москва">
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col">
+          <label>Меняли фамилию?</label>
+          <div class="radio-group">
+            <label><input type="radio" name="surnameChanged" value="да"> Да</label>
+            <label><input type="radio" name="surnameChanged" value="нет" checked> Нет</label>
+          </div>
+        </div>
+        <div class="col wide" id="surnameReasonField" style="display:none;">
+          <label>Укажите предыдущую фамилию (фамилии), год изменения и причину</label>
+          <textarea id="surnameReason" rows="2"></textarea>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col">
+          <label>Дата рождения <span class="req">*</span></label>
+          <input id="birth" required placeholder="дд.мм.гггг" maxlength="10" oninput="formatDateStr(this)">
+        </div>
+        <div class="col">
+          <label>Место рождения <span class="req">*</span></label>
+          <input id="birthPlace" required>
+        </div>
+        <div class="col">
+          <label>Гражданство <span class="req">*</span></label>
+          <input id="citizenship" required value="РФ">
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col wide">
+          <label>Адрес регистрации по месту жительства (постоянно) <span class="req">*</span></label>
+          <input id="regAddress" required placeholder="г. Санкт-Петербург, ул. Ленина, д. 1, кв. 1">
+        </div>
+      </div>
+      <div class="row">
+        <div class="col wide">
+          <label>Адрес регистрации по месту пребывания (временно)</label>
+          <input id="tempRegAddress" placeholder="г. Москва, ул. Пушкина, д. 10, кв. 5">
+        </div>
+      </div>
+      <div class="row">
+        <div class="col wide">
+          <label>Адрес фактического места жительства <span class="req">*</span></label>
+          <input id="actualAddress" required placeholder="г. Санкт-Петербург, Невский пр-т, д. 100, кв. 20">
+        </div>
+      </div>
+      <div class="row">
+        <div class="col">
+          <label>Телефон <span class="req">*</span></label>
+          <input id="phone" required placeholder="+7(000)000-00-00" maxlength="16" oninput="formatPhone(this)">
+        </div>
+        <div class="col">
+          <label>Email <span class="req">*</span></label>
+          <input id="email" type="email" required placeholder="email@mail.ru">
+        </div>
+        <div class="col">
+          <label>ИНН (12 цифр) <span class="req">*</span></label>
+          <input id="inn" required maxlength="12" placeholder="000000000000" oninput="this.value = this.value.replace(/\D/g, '')">
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- ============ 2. ОБРАЗОВАНИЕ ============ -->
+    <fieldset>
+      <legend>2. Образование</legend>
+
+      <div class="row">
+        <div class="col">
+          <label>Уровень образования</label>
+          <select id="eduLevel">
+            <option>Высшее</option>
+            <option>Среднее профессиональное</option>
+            <option>Среднее</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="desc">Укажите оконченные учебные заведения (указание одного учебного заведения обязательно, если вы имеете среднее общее (полное) образование, то укажите школу (гимназию и т.п.)).</div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Начало (гггг) <span class="req">*</span></th>
+              <th>Конец (гггг) <span class="req">*</span></th>
+              <th>Наименование <span class="req">*</span></th>
+              <th>Факультет</th>
+              <th>Специальность</th>
+              <th>Квалификация</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="eduBody"></tbody>
+        </table>
+      </div>
+      <button type="button" class="add-row" id="addEduBtn">➕ Добавить учебное заведение</button>
+
+      <div class="row" style="margin-top:20px;">
+        <div class="col">
+          <label>Имеется ли у Вас ученая степень?</label>
+          <div class="radio-group">
+            <label><input type="radio" name="academicDegree" value="да"> Да</label>
+            <label><input type="radio" name="academicDegree" value="нет" checked> Нет</label>
+          </div>
+        </div>
+        <div class="col wide" id="degreeField" style="display:none;">
+          <label>Укажите кем и когда присвоено, какая степень</label>
+          <textarea id="degreeText" rows="2"></textarea>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col">
+          <label>Курсы повышения квалификации, дополнительные программы обучения?</label>
+          <div class="radio-group">
+            <label><input type="radio" name="addEdu" value="да"> Да</label>
+            <label><input type="radio" name="addEdu" value="нет" checked> Нет</label>
+          </div>
+        </div>
+        <div class="col wide" id="addEduField" style="display:none;">
+          <label>Укажите наименование, период обучения</label>
+          <textarea id="addEduText" rows="2"></textarea>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col">
+          <label>Лицензии, сертификаты, членство в проф. организациях?</label>
+          <div class="radio-group">
+            <label><input type="radio" name="license" value="да"> Да</label>
+            <label><input type="radio" name="license" value="нет" checked> Нет</label>
+          </div>
+        </div>
+        <div class="col wide" id="licenseField" style="display:none;">
+          <label>Укажите наименование, и полные данные (дата, номер и так далее)</label>
+          <textarea id="licenseText" rows="2"></textarea>
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- ============ 3. ОПЫТ РАБОТЫ ============ -->
+    <fieldset>
+      <legend>3. Предыдущий опыт работы</legend>
+
+      <div class="desc">Укажите последние три места работы. Если у Вас отсутствует трудовой стаж, выберите "Я не имею трудового стажа". Заполняйте в первой строке последнее место работы. Если вы трудоустроены в настоящее время в столбце "Окончание работы (мм.гггг)" укажите <strong>н.в.</strong></div>
+
+      <div class="checkbox-inline">
+        <input type="checkbox" id="noExperience">
+        <label for="noExperience" style="margin:0;">Я не имею трудового стажа и опыта работы</label>
+      </div>
+
+      <div id="workBlock">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Начало (мм.гггг) <span class="req">*</span></th>
+                <th>Окончание (мм.гггг) <span class="req">*</span></th>
+                <th>Организация <span class="req">*</span></th>
+                <th>Должность, кол-во подчинённых <span class="req">*</span></th>
+                <th>Причина увольнения <span class="req">*</span></th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="workBody"></tbody>
+          </table>
+        </div>
+        <button type="button" class="add-row" id="addWorkBtn">➕ Добавить место работы</button>
+      </div>
+
+      <div class="desc" style="margin-top:25px;">Укажите Ф.И.О., должности, контактные телефоны руководителей или коллег с предыдущих мест работы, которые могут дать Вам рекомендации</div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ФИО</th>
+              <th>Место работы</th>
+              <th>Должность</th>
+              <th>Телефон</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="recBody"></tbody>
+        </table>
+      </div>
+      <button type="button" class="add-row" id="addRecBtn">➕ Добавить лицо для рекомендации</button>
+    </fieldset>
+
+    <!-- ============ 4. ГОССЛУЖБА ============ -->
+    <fieldset>
+      <legend>4. Государственная и муниципальная служба</legend>
+
+      <div class="desc">Являетесь ли Вы в настоящее время (являлись в течение предшествующих двух лет) государственным/муниципальным служащим, обязанным предоставлять сведения о замещении должности государственной/муниципальной службы (ст. 64.1 ТК РФ, ст. 12 Федерального закона от 25.12.2008 № 273-ФЗ «О противодействии коррупции»)?</div>
+
+      <div class="radio-group">
+        <label><input type="radio" name="gossl" value="да"> Да</label>
+        <label><input type="radio" name="gossl" value="нет" checked> Нет</label>
+      </div>
+
+      <div id="gosslBlock" class="hidden-block">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Период с (мм.гггг)</th>
+                <th>Период по (мм.гггг)</th>
+                <th>Должность</th>
+                <th>Организация, адрес, телефон</th>
+                <th>Дата увольнения</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="gosslBody"></tbody>
+          </table>
+        </div>
+        <button type="button" class="add-row" id="addGosslBtn">➕ Добавить строку</button>
+      </div>
+    </fieldset>
+
+    <!-- ============ 5. СЕМЬЯ ============ -->
+    <fieldset>
+      <legend>5. Семья</legend>
+
+      <div class="row">
+        <div class="col">
+          <label>Семейное положение <span class="req">*</span></label>
+          <input id="familyStatus" required placeholder="женат/замужем, холост/не замужем, разведён(а)">
+        </div>
+      </div>
+
+      <div class="desc">Укажите Ваших близких родственников (супруг(а), дети, отец, мать)</div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Степень родства</th>
+              <th>ФИО</th>
+              <th>Дата рождения</th>
+              <th>Место работы/учёбы</th>
+              <th>Должность</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="familyBody"></tbody>
+        </table>
+      </div>
+      <button type="button" class="add-row" id="addFamilyBtn">➕ Родственник</button>
+    </fieldset>
+
+    <!-- ============ 6. ИНАЯ ИНФОРМАЦИЯ ============ -->
+    <fieldset>
+      <legend>6. Иная информация</legend>
+
+      <div class="row">
+        <div class="col">
+          <label>Отношение к воинской обязанности</label>
+          <div class="radio-group">
+            <label><input type="radio" name="military" value="военнообязанный"> Военнообязанный</label>
+            <label><input type="radio" name="military" value="невоеннообязанный" checked> Невоеннообязанный</label>
+          </div>
+        </div>
+        <div class="col" id="militaryRankField" style="display:none;">
+          <label>Звание</label>
+          <input id="militaryRank">
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col">
+          <label>Наличие личного автотранспорта</label>
+          <div class="radio-group">
+            <label><input type="radio" name="hasCar" value="да"> Да</label>
+            <label><input type="radio" name="hasCar" value="нет" checked> Нет</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col">
+          <label>Наличие водительского удостоверения</label>
+          <div class="radio-group">
+            <label><input type="radio" name="driver" value="да"> Да</label>
+            <label><input type="radio" name="driver" value="нет" checked> Нет</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col">
+          <label>Рассматривали ли Вас на иные вакансии в ГК ФСК СЗ?</label>
+          <div class="radio-group">
+            <label><input type="radio" name="otherVac" value="да"> Да</label>
+            <label><input type="radio" name="otherVac" value="нет" checked> Нет</label>
+          </div>
+        </div>
+      </div>
+      <div id="otherVacBlock" class="hidden-block">
+        <div class="desc">Укажите наименование вакансии и примерный временной промежуток рассмотрения</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Вакансия</th><th>Период</th><th></th></tr></thead>
+            <tbody id="otherVacBody"></tbody>
+          </table>
+        </div>
+        <button type="button" class="add-row" id="addOtherVacBtn">➕ Добавить строку</button>
+      </div>
+
+      <div class="row" style="margin-top:20px;">
+        <div class="col">
+          <label>Наличие родственных связей с работниками ГК ФСК Северо-Запад</label>
+          <div class="radio-group">
+            <label><input type="radio" name="hasRelatives" value="да"> Да</label>
+            <label><input type="radio" name="hasRelatives" value="нет" checked> Нет</label>
+          </div>
+        </div>
+      </div>
+      <div id="relativesBlock" class="hidden-block">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>ФИО работника</th><th>Должность работника</th><th>Родственная связь</th><th></th></tr></thead>
+            <tbody id="relativesBody"></tbody>
+          </table>
+        </div>
+        <button type="button" class="add-row" id="addRelativesBtn">➕ Добавить родственника</button>
+      </div>
+
+      <div class="row" style="margin-top:20px;">
+        <div class="col">
+          <label>Наличие личных знакомств с работниками ГК ФСК Северо-Запад</label>
+          <div class="radio-group">
+            <label><input type="radio" name="hasPersonalAcquaintance" value="да"> Да</label>
+            <label><input type="radio" name="hasPersonalAcquaintance" value="нет" checked> Нет</label>
+          </div>
+        </div>
+      </div>
+      <div id="acquaintancesBlock" class="hidden-block">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>ФИО работника</th><th>Должность работника</th><th>Обстоятельства знакомства</th><th></th></tr></thead>
+            <tbody id="acquaintancesBody"></tbody>
+          </table>
+        </div>
+        <button type="button" class="add-row" id="addAcquaintanceBtn">➕ Добавить знакомство</button>
+      </div>
+
+      <div class="row" style="margin-top:20px;">
+        <div class="col">
+          <label>Являетесь ли Вы в настоящее время и являлись ли ранее бенефициаром, руководителем, учредителем (участником) предприятий, индивидуальным предпринимателем, самозанятым лицом?</label>
+          <div class="radio-group">
+            <label><input type="radio" name="beneficial" value="да"> Да</label>
+            <label><input type="radio" name="beneficial" value="нет" checked> Нет</label>
+          </div>
+        </div>
+      </div>
+      <div id="beneficialBlock" class="hidden-block">
+        <label>Наименование, ИНН, адрес</label>
+        <textarea id="beneficialText" rows="3"></textarea>
+      </div>
+    </fieldset>
+
+    <!-- ============ 7. ДОКУМЕНТЫ ============ -->
+    <fieldset>
+      <legend>7. Документы</legend>
+
+      <div class="desc">Прикрепите ксерокопию паспорта с регистрацией и иные документы по необходимости <span class="req">*</span></div>
+
+      <input type="file" id="fileInput" multiple accept=".pdf,.jpg,.jpeg,.png" style="display:none;">
+      <button type="button" class="upload-btn-large" id="uploadBtnLarge">➕ Добавить файлы</button>
+      <div id="filesList" class="files-list"></div>
+    </fieldset>
+
+    <!-- ============ СОГЛАСИЕ ============ -->
+    <div class="consent-box" id="consentBox">
+      <label>
+        <input type="checkbox" id="consent" tabindex="-1">
+        <span>Я даю согласие на обработку персональных данных — <span class="consent-link" id="consentOpenLink">ознакомиться с текстом</span></span>
+      </label>
+    </div>
+
+    <div class="submit-row">
+      <button type="submit" class="submit-btn" id="submitBtn">ОТПРАВИТЬ АНКЕТУ</button>
+    </div>
+  </form>
+</div>
+
+<!-- Модалка согласия -->
+<div class="modal" id="consentModal">
+  <div class="modal-content">
+    <h2>СОГЛАСИЕ СОИСКАТЕЛЯ<br>на обработку персональных данных</h2>
+    <p>В соответствии со ст. 9 Федерального закона от 27.07.2006 N 152-ФЗ "О персональных данных", Я, <strong id="mFio">—</strong>, паспорт <strong id="mPassport">—</strong>, зарегистрированный по адресу: <strong id="mAddress">—</strong>, даю согласие: ООО "УК ФСК СЗ" (ИНН 7813645150), расположенному по адресу: г. Санкт-Петербург, ул. Матроса Железняка, д. 2, стр. 1, на обработку моих персональных данных и на получение моих персональных данных о предыдущих местах работы и периодах трудовой деятельности от третьих лиц с целью принятия решения о трудоустройстве, с последующим уничтожением полученных от меня и от третьих лиц данных в течение 30 дней, в случае если мне будет отказано в трудоустройстве, в соответствии с требованием закона о персональных данных от 27.07.2006 № 152-ФЗ.</p>
+    <p>Под обработкой персональных данных в настоящем согласии понимается сбор, запись, систематизация, накопление, хранение, уточнение, извлечение, использование, передача, обезличивание, блокирование, удаление, уничтожение персональных данных.</p>
+    <p>Свои права, предусмотренные Федеральным законом от 27.07.2006 № 152-ФЗ «О персональных данных» (в том числе право на доступ к своим персональным данным, право на их уточнение, блокирование или уничтожение, право на отзыв согласия), я могу реализовать в порядке, установленном указанным Федеральным законом — текст доступен на официальном портале правовой информации: <a href="http://pravo.gov.ru/proxy/ips/?docbody=&nd=102108261" target="_blank">pravo.gov.ru (152-ФЗ)</a>.</p>
+    <p><strong>Перечень персональных данных:</strong></p>
+    <ul>
+      <li>фамилия, имя, отчество;</li>
+      <li>пол, возраст;</li>
+      <li>дата и место рождения;</li>
+      <li>паспортные данные;</li>
+      <li>адрес регистрации и фактического проживания;</li>
+      <li>номер телефона, email;</li>
+      <li>данные документов об образовании, квалификации;</li>
+      <li>характеристики, рекомендации;</li>
+      <li>семейное положение, сведения о составе семьи;</li>
+      <li>отношение к воинской обязанности;</li>
+      <li>сведения о трудовом стаже, предыдущих местах работы, доходах;</li>
+      <li>сведения о деловых и иных личных качествах.</li>
+    </ul>
+    <p><strong>Действия с персональными данными:</strong> сбор, систематизация, накопление, хранение, обновление, изменение, использование, обезличивание, блокирование, уничтожение, обработка с использованием средств автоматизации.</p>
+    <p>Обработка персональных данных допускается в электронном виде и на бумажных носителях. Настоящее согласие может быть отозвано в любой момент по письменному заявлению соискателя.</p>
+    <button type="button" class="modal-btn" id="consentAcceptBtn">Я ознакомился и согласен</button>
+  </div>
+</div>
+<script>
+(function () {
+'use strict';
+
+// ========================================================
+// КОНФИГ
+// ========================================================
+var BUFFER_URL = 'https://bufferfskdb.relaxdev.ru';
+var OWN_SERVER_SUBMIT = '/api/v1/anketa/submit';
+var OWN_SERVER_PREFILL = '/api/v1/anketa/prefill';
+var BUFFER_SUBMIT = BUFFER_URL + '/api/anketa';
+var BUFFER_PREFILL = BUFFER_URL + '/api/anketa/prefill';
+var RESEND_LINK_URL = '/api/v1/anketa/resend-link';   // backend endpoint (сделаем позже)
+
+// Определяем режим: own_server или buffer
+var IS_OWN_SERVER = (
+  location.hostname === '10.0.92.116' ||
+  location.hostname === 'fsknw-db.local' ||
+  location.hostname === 'localhost' ||
+  location.hostname === '127.0.0.1'
+);
+var IS_BUFFER_MODE = !IS_OWN_SERVER;
+
+// Публичный RSA (для шифрования AES-ключа в buffer-режиме)
+var PUBLIC_KEY_PEM = '-----BEGIN PUBLIC KEY-----\n' +
+'MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAtYD1oP6pvdKzXyAK6349\n' +
+'oVdUy+7T1hkKGHPV1EdMqqIJsUKRx2/Y1czGMlIv+zvDC6c7VsRHg3mdpoibnxR0\n' +
+'DAT74wLx/4nVhXl4SNarjh6cfLCYpZoXx2XPptqWW8JFs2TCy6rmgAWnyctMkIm9\n' +
+'Nw+4me+QVbXUvEufwb+pOhVCmm2xu/NcxDXdixypAdxTsOR9F3Cn5zfapF7wHq+f\n' +
+'Pfw7AAnb8idtAB6IfClgztPd5WSl29Q/AnHfQzrnKZYcZDrOu+ksN0wd74X3NR5E\n' +
+'eaCuTlFL+Xodk1P73wgqIkJyPY869gf1i42xTQrf56tP8kqP6rCNlZLHRVvHXpOl\n' +
+'TeJoomnVGm2t/s7GrQjFL8KFy7zbhoLZRBxOi8l1ZK2rOTKdQH5xaQHOU6/O0boz\n' +
+'iKz1F2djAC3maNVXLIymUiSNAre8++y3Jp37Fi41G/stPNeOiLkbNQEZaH3+TKep\n' +
+'vfy6zxBtPtESd8W7V9fWC1zorjeAShqaSM3J39PdBdLP63i6YbR7w9f0ND/zCWfQ\n' +
+'sbJGA2+ZSFCcMxioHE+i9qSNkbAZpzHdzZq+XAXDDyf3PxMZIwp5+Mg76H2NwfWS\n' +
+'+iRIMCDuWcEvNZ1IZC7ePp0JzjH1/UFTMDfSay6ebIsOR+T6c25T4OVZuknBqGF2\n' +
+'heYCF4W8UjjeTIZ7YHphfeECAwEAAQ==\n' +
+'-----END PUBLIC KEY-----';
+
+// ========================================================
+// БАЗОВЫЕ ХЕЛПЕРЫ
+// ========================================================
+function val(id) {
+  var el = document.getElementById(id);
+  return el ? el.value.trim() : '';
+}
+function mark(id, bad) {
+  var el = document.getElementById(id);
+  if (el) el.classList.toggle('field-error', !!bad);
+}
+function getStatusEl() { return document.getElementById('status'); }
+function showStatus(type, html) {
+  var el = getStatusEl();
+  el.className = 'status ' + type;
+  el.innerHTML = html;
+}
+function hideStatus() { getStatusEl().className = 'status hidden'; }
+
+// ========================================================
+// URL + ФРАГМЕНТ + localStorage
+// ========================================================
+function getTokenFromUrl() {
+  try {
+    var params = new URLSearchParams(window.location.search);
+    return params.get('token') || '';
+  } catch (e) { return ''; }
+}
+
+function getHashParam(name) {
+  var h = window.location.hash || '';
+  if (h.charAt(0) === '#') h = h.substring(1);
+  if (!h) return '';
+  var parts = h.split('&');
+  for (var i = 0; i < parts.length; i++) {
+    var kv = parts[i].split('=');
+    if (decodeURIComponent(kv[0]) === name) {
+      return decodeURIComponent(kv.slice(1).join('='));
+    }
+  }
+  return '';
+}
+
+function getKeyFromUrlOrStorage(token) {
+  if (!token) return '';
+  var fragKey = getHashParam('k');
+  if (fragKey) {
+    try { localStorage.setItem('fsk_anketa_key_' + token, fragKey); } catch (e) {}
+    return fragKey;
+  }
+  try {
+    var stored = localStorage.getItem('fsk_anketa_key_' + token);
+    return stored || '';
+  } catch (e) { return ''; }
+}
+
+// ========================================================
+// BASE64 / ARRAYBUFFER
+// ========================================================
+function b64ToBytes(b64) {
+  var pad = b64.length % 4;
+  if (pad) b64 += '='.repeat(4 - pad);
+  var bin = atob(b64);
+  var bytes = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+function bytesToB64(bytes) {
+  var bin = '';
+  var arr = new Uint8Array(bytes);
+  for (var i = 0; i < arr.length; i++) bin += String.fromCharCode(arr[i]);
+  return btoa(bin);
+}
+
+// ========================================================
+// КРИПТА — Web Crypto API
+// ========================================================
+var _rsaPubPromise = null;
+function importRsaPublicKey() {
+  if (_rsaPubPromise) return _rsaPubPromise;
+  _rsaPubPromise = (function () {
+    var pem = PUBLIC_KEY_PEM
+      .replace('-----BEGIN PUBLIC KEY-----', '')
+      .replace('-----END PUBLIC KEY-----', '')
+      .replace(/\s+/g, '');
+    var bytes = b64ToBytes(pem);
+    return crypto.subtle.importKey(
+      'spki',
+      bytes.buffer,
+      { name: 'RSA-OAEP', hash: 'SHA-256' },
+      false,
+      ['encrypt']
+    );
+  })();
+  return _rsaPubPromise;
+}
+
+async function encryptPayload(payloadObj) {
+  // 1. JSON
+  var jsonBytes = new TextEncoder().encode(JSON.stringify(payloadObj));
+  // 2. AES-256-GCM
+  var aesKey = await crypto.subtle.generateKey(
+    { name: 'AES-GCM', length: 256 }, true, ['encrypt']
+  );
+  var iv = crypto.getRandomValues(new Uint8Array(12));
+  var ctBuf = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv: iv }, aesKey, jsonBytes
+  );
+  // 3. RSA-OAEP обёртка AES-ключа
+  var rawKey = await crypto.subtle.exportKey('raw', aesKey);
+  var rsaPub = await importRsaPublicKey();
+  var wrappedBuf = await crypto.subtle.encrypt(
+    { name: 'RSA-OAEP' }, rsaPub, rawKey
+  );
+  return {
+    encrypted_data: bytesToB64(ctBuf),
+    encrypted_key: bytesToB64(wrappedBuf),
+    iv: bytesToB64(iv)
+  };
+}
+
+async function decryptPayload(encryptedB64, ivB64, keyB64) {
+  var keyBytes = b64ToBytes(keyB64);
+  var iv = b64ToBytes(ivB64);
+  var ct = b64ToBytes(encryptedB64);
+  var aesKey = await crypto.subtle.importKey(
+    'raw', keyBytes, { name: 'AES-GCM' }, false, ['decrypt']
+  );
+  var plainBuf = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: iv }, aesKey, ct
+  );
+  return new TextDecoder().decode(plainBuf);
+}
+
+async function encryptFileBlob(file, aesKey) {
+  // Отдельный IV на каждый файл
+  var fileBuf = await file.arrayBuffer();
+  var iv = crypto.getRandomValues(new Uint8Array(12));
+  var ctBuf = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv: iv }, aesKey, fileBuf
+  );
+  return bytesToB64(iv) + '|' + bytesToB64(ctBuf);
+}
+
+// Для файлов в buffer-режиме используем ТОТ ЖЕ AES-ключ,
+// что и для payload. Экспортируем/импортируем ключ.
+async function exportAesKeyRaw(aesKey) {
+  return new Uint8Array(await crypto.subtle.exportKey('raw', aesKey));
+}
+async function importAesKeyRaw(raw) {
+  return crypto.subtle.importKey(
+    'raw', raw, { name: 'AES-GCM' }, false, ['encrypt']
+  );
+}
+
+// ========================================================
+// ФОРМАТИРОВАНИЕ (глобальные — используются в inline oninput)
+// ========================================================
+function formatDateStr(el) {
+  var v = el.value.replace(/\D/g, '');
+  if (v.length === 0) { el.value = ''; return; }
+  if (v.length <= 2) el.value = v;
+  else if (v.length <= 4) el.value = v.slice(0, 2) + '.' + v.slice(2);
+  else el.value = v.slice(0, 2) + '.' + v.slice(2, 4) + '.' + v.slice(4, 8);
+}
+function formatMonthYear(el) {
+  var v = el.value.replace(/\D/g, '');
+  if (v.length === 0) { el.value = ''; return; }
+  if (v.length <= 2) el.value = v;
+  else el.value = v.slice(0, 2) + '.' + v.slice(2, 6);
+}
+function formatPhone(el) {
+  var v = el.value.replace(/\D/g, '');
+  if (v.length === 0) { el.value = ''; return; }
+  var f = '+7';
+  if (v.length > 1) f += '(' + v.substring(1, 4); else f += '(';
+  if (v.length >= 4) f += ')' + v.substring(4, 7); else if (v.length > 1) f += ')';
+  if (v.length >= 7) f += '-' + v.substring(7, 9);
+  if (v.length >= 9) f += '-' + v.substring(9, 11);
+  el.value = f;
+}
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
+window.formatDateStr = formatDateStr;
+window.formatMonthYear = formatMonthYear;
+window.formatPhone = formatPhone;
+window.autoResize = autoResize;
+
+// ========================================================
+// ДИНАМИЧЕСКИЕ ТАБЛИЦЫ
+// ========================================================
+var counters = { edu: 0, work: 0, rec: 0, gossl: 0, family: 0, otherVac: 0, relatives: 0, acquaintances: 0 };
+
+function addEduRow() {
+  var i = counters.edu++;
+  var tr = document.createElement('tr');
+  tr.innerHTML =
+    '<td><input name="edu_start_' + i + '" placeholder="2010" maxlength="4" oninput="this.value=this.value.replace(/\\D/g,\'\')"></td>' +
+    '<td><input name="edu_end_' + i + '" placeholder="2015" maxlength="4" oninput="this.value=this.value.replace(/\\D/g,\'\')"></td>' +
+    '<td><textarea name="edu_org_' + i + '" placeholder="ФГБОУ ВО СПбГУ" rows="1"></textarea></td>' +
+    '<td><textarea name="edu_fac_' + i + '" placeholder="Юридический" rows="1"></textarea></td>' +
+    '<td><textarea name="edu_spec_' + i + '" placeholder="Юриспруденция" rows="1"></textarea></td>' +
+    '<td><textarea name="edu_qual_' + i + '" placeholder="Юрист" rows="1"></textarea></td>' +
+    '<td><button type="button" class="del-btn">✕</button></td>';
+  tr.querySelector('.del-btn').onclick = function () { tr.remove(); };
+  document.getElementById('eduBody').appendChild(tr);
+  return tr;
+}
+function addWorkRow() {
+  var i = counters.work++;
+  var tr = document.createElement('tr');
+  tr.innerHTML =
+    '<td><input name="work_start_' + i + '" placeholder="01.2020" maxlength="7" oninput="formatMonthYear(this)"></td>' +
+    '<td><input name="work_end_' + i + '" placeholder="12.2022 или н.в." maxlength="20"></td>' +
+    '<td><textarea name="work_org_' + i + '" placeholder="ООО «Ромашка»" rows="1"></textarea></td>' +
+    '<td><textarea name="work_post_' + i + '" placeholder="Менеджер, 5 чел." rows="1"></textarea></td>' +
+    '<td><textarea name="work_reason_' + i + '" placeholder="Собственное желание" rows="1"></textarea></td>' +
+    '<td><button type="button" class="del-btn">✕</button></td>';
+  tr.querySelector('.del-btn').onclick = function () { tr.remove(); };
+  document.getElementById('workBody').appendChild(tr);
+  return tr;
+}
+function addRecRow() {
+  var i = counters.rec++;
+  var tr = document.createElement('tr');
+  tr.innerHTML =
+    '<td><textarea name="rec_fio_' + i + '" rows="1" placeholder="Иванов Иван Иванович"></textarea></td>' +
+    '<td><textarea name="rec_work_' + i + '" rows="1" placeholder="ООО «Ромашка»"></textarea></td>' +
+    '<td><textarea name="rec_title_' + i + '" rows="1" placeholder="Начальник отдела"></textarea></td>' +
+    '<td><input name="rec_phone_' + i + '" maxlength="16" oninput="formatPhone(this)" placeholder="+7(000)000-00-00"></td>' +
+    '<td><button type="button" class="del-btn">✕</button></td>';
+  tr.querySelector('.del-btn').onclick = function () { tr.remove(); };
+  document.getElementById('recBody').appendChild(tr);
+  return tr;
+}
+function addGosslRow() {
+  var i = counters.gossl++;
+  var tr = document.createElement('tr');
+  tr.innerHTML =
+    '<td><input name="gossl_period_from_' + i + '" placeholder="мм.гггг" maxlength="7" oninput="formatMonthYear(this)"></td>' +
+    '<td><input name="gossl_period_to_' + i + '" placeholder="мм.гггг" maxlength="7" oninput="formatMonthYear(this)"></td>' +
+    '<td><textarea name="gossl_position_' + i + '" rows="1"></textarea></td>' +
+    '<td><textarea name="gossl_org_' + i + '" rows="1"></textarea></td>' +
+    '<td><input name="gossl_date_' + i + '" placeholder="дд.мм.гггг" maxlength="10" oninput="formatDateStr(this)"></td>' +
+    '<td><button type="button" class="del-btn">✕</button></td>';
+  tr.querySelector('.del-btn').onclick = function () { tr.remove(); };
+  document.getElementById('gosslBody').appendChild(tr);
+  return tr;
+}
+function addFamilyRow() {
+  var i = counters.family++;
+  var tr = document.createElement('tr');
+  tr.innerHTML =
+    '<td><textarea name="fam_rel_' + i + '" rows="1"></textarea></td>' +
+    '<td><textarea name="fam_fio_' + i + '" rows="1"></textarea></td>' +
+    '<td><input name="fam_birth_' + i + '" placeholder="дд.мм.гггг" maxlength="10" oninput="formatDateStr(this)"></td>' +
+    '<td><textarea name="fam_work_' + i + '" rows="1"></textarea></td>' +
+    '<td><textarea name="fam_position_' + i + '" rows="1"></textarea></td>' +
+    '<td><button type="button" class="del-btn">✕</button></td>';
+  tr.querySelector('.del-btn').onclick = function () { tr.remove(); };
+  document.getElementById('familyBody').appendChild(tr);
+  return tr;
+}
+function addOtherVacRow() {
+  var i = counters.otherVac++;
+  var tr = document.createElement('tr');
+  tr.innerHTML =
+    '<td><textarea name="other_vac_name_' + i + '" rows="1"></textarea></td>' +
+    '<td><textarea name="other_vac_period_' + i + '" rows="1"></textarea></td>' +
+    '<td><button type="button" class="del-btn">✕</button></td>';
+  tr.querySelector('.del-btn').onclick = function () { tr.remove(); };
+  document.getElementById('otherVacBody').appendChild(tr);
+  return tr;
+}
+function addRelativesRow() {
+  var i = counters.relatives++;
+  var tr = document.createElement('tr');
+  tr.innerHTML =
+    '<td><textarea name="relatives_fio_' + i + '" rows="1"></textarea></td>' +
+    '<td><textarea name="relatives_position_' + i + '" rows="1"></textarea></td>' +
+    '<td><textarea name="relatives_relation_' + i + '" rows="1"></textarea></td>' +
+    '<td><button type="button" class="del-btn">✕</button></td>';
+  tr.querySelector('.del-btn').onclick = function () { tr.remove(); };
+  document.getElementById('relativesBody').appendChild(tr);
+  return tr;
+}
+function addAcquaintancesRow() {
+  var i = counters.acquaintances++;
+  var tr = document.createElement('tr');
+  tr.innerHTML =
+    '<td><textarea name="personal_fio_' + i + '" rows="1"></textarea></td>' +
+    '<td><textarea name="personal_position_' + i + '" rows="1"></textarea></td>' +
+    '<td><textarea name="personal_circumstances_' + i + '" rows="1"></textarea></td>' +
+    '<td><button type="button" class="del-btn">✕</button></td>';
+  tr.querySelector('.del-btn').onclick = function () { tr.remove(); };
+  document.getElementById('acquaintancesBody').appendChild(tr);
+  return tr;
+}
+
+addEduRow(); addWorkRow(); addRecRow(); addGosslRow();
+addFamilyRow(); addOtherVacRow(); addRelativesRow(); addAcquaintancesRow();
+
+document.getElementById('addEduBtn').onclick = addEduRow;
+document.getElementById('addWorkBtn').onclick = addWorkRow;
+document.getElementById('addRecBtn').onclick = addRecRow;
+document.getElementById('addGosslBtn').onclick = addGosslRow;
+document.getElementById('addFamilyBtn').onclick = addFamilyRow;
+document.getElementById('addOtherVacBtn').onclick = addOtherVacRow;
+document.getElementById('addRelativesBtn').onclick = addRelativesRow;
+document.getElementById('addAcquaintanceBtn').onclick = addAcquaintancesRow;
+
+// ========================================================
+// TOGGLE-БЛОКИ (radio → показать/скрыть)
+// ========================================================
+function applyToggle(n, v) {
+  if (n === 'surnameChanged') document.getElementById('surnameReasonField').style.display = v === 'да' ? 'block' : 'none';
+  if (n === 'academicDegree') document.getElementById('degreeField').style.display = v === 'да' ? 'block' : 'none';
+  if (n === 'addEdu') document.getElementById('addEduField').style.display = v === 'да' ? 'block' : 'none';
+  if (n === 'license') document.getElementById('licenseField').style.display = v === 'да' ? 'block' : 'none';
+  if (n === 'gossl') document.getElementById('gosslBlock').classList.toggle('visible', v === 'да');
+  if (n === 'military') document.getElementById('militaryRankField').style.display = v === 'военнообязанный' ? 'block' : 'none';
+  if (n === 'otherVac') document.getElementById('otherVacBlock').classList.toggle('visible', v === 'да');
+  if (n === 'hasRelatives') document.getElementById('relativesBlock').classList.toggle('visible', v === 'да');
+  if (n === 'hasPersonalAcquaintance') document.getElementById('acquaintancesBlock').classList.toggle('visible', v === 'да');
+  if (n === 'beneficial') document.getElementById('beneficialBlock').classList.toggle('visible', v === 'да');
+}
+document.addEventListener('change', function (e) {
+  if (e.target.type === 'radio') applyToggle(e.target.name, e.target.value);
+});
+document.addEventListener('input', function (e) {
+  if (e.target && e.target.tagName === 'TEXTAREA') autoResize(e.target);
+});
+
+document.getElementById('noExperience').addEventListener('change', function () {
+  var block = document.getElementById('workBlock');
+  var inputs = block.querySelectorAll('input, textarea');
+  if (this.checked) {
+    block.style.opacity = '0.5';
+    inputs.forEach(function (el) { el.disabled = true; });
+  } else {
+    block.style.opacity = '1';
+    inputs.forEach(function (el) { el.disabled = false; });
+  }
+});
+
+// ========================================================
+// ФАЙЛЫ
+// ========================================================
+var files = [];
+var fileInput = document.getElementById('fileInput');
+var filesList = document.getElementById('filesList');
+
+document.getElementById('uploadBtnLarge').addEventListener('click', function () {
+  fileInput.click();
+});
+fileInput.addEventListener('change', function (e) {
+  var list = Array.prototype.slice.call(e.target.files || []);
+  list.forEach(function (f) {
+    if (files.length >= 5) { alert('Не больше 5 файлов'); return; }
+    files.push(f);
+  });
+  e.target.value = '';
+  renderFiles();
+});
+function renderFiles() {
+  filesList.innerHTML = '';
+  files.forEach(function (f, i) {
+    var div = document.createElement('div');
+    div.className = 'file-item';
+    var span = document.createElement('span');
+    span.textContent = f.name;
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = '✕';
+    btn.onclick = function () { files.splice(i, 1); renderFiles(); };
+    div.appendChild(span); div.appendChild(btn);
+    filesList.appendChild(div);
+  });
+}
+
+// ========================================================
+// МОДАЛКА СОГЛАСИЯ
+// ========================================================
+var consentModal = document.getElementById('consentModal');
+var consentCheckbox = document.getElementById('consent');
+var consentBox = document.getElementById('consentBox');
+var consentApproved = false;
+
+function openConsentModal() {
+  var fio = val('fio');
+  var pass = val('passportData');
+  var addr = val('regAddress');
+  if (!fio || !pass || !addr) {
+    alert('Заполните ФИО, паспортные данные и адрес регистрации перед ознакомлением с согласием');
+    return;
+  }
+  document.getElementById('mFio').textContent = fio;
+  document.getElementById('mPassport').textContent = pass;
+  document.getElementById('mAddress').textContent = addr;
+  consentModal.classList.add('open');
+}
+consentCheckbox.addEventListener('click', function (e) { e.preventDefault(); });
+consentBox.addEventListener('click', function (e) {
+  if (consentApproved) return;
+  e.preventDefault();
+  openConsentModal();
+});
+document.getElementById('consentAcceptBtn').addEventListener('click', function (e) {
+  e.stopPropagation();
+  consentApproved = true;
+  consentCheckbox.checked = true;
+  consentModal.classList.remove('open');
+});
+consentModal.addEventListener('click', function (e) {
+  if (e.target === consentModal) consentModal.classList.remove('open');
+});
+
+// ========================================================
+// ПРЕДУПРЕЖДЕНИЕ О ЗАМЕЧАНИЯХ
+// ========================================================
+function showRemarks(remarks) {
+  if (!remarks || !String(remarks).trim()) return;
+  var banner = document.getElementById('remarksBanner');
+  var text = document.getElementById('remarksText');
+  if (banner && text) {
+    text.textContent = String(remarks);
+    banner.classList.add('visible');
+  }
+}
+
+// ========================================================
+// СБОР PAYLOAD
+// ========================================================
+var form = document.getElementById('anketaForm');
+
+function collectPayload() {
+  var p = {
+    fio: val('fio'),
+    passportData: val('passportData'),
+    birth: val('birth'),
+    birthPlace: val('birthPlace'),
+    citizenship: val('citizenship'),
+    regAddress: val('regAddress'),
+    tempRegAddress: val('tempRegAddress'),
+    actualAddress: val('actualAddress'),
+    phone: val('phone'),
+    email: val('email'),
+    inn: val('inn'),
+    surnameChanged: (document.querySelector('input[name="surnameChanged"]:checked') || {}).value || 'нет',
+    surnameReason: val('surnameReason'),
+    eduLevel: val('eduLevel'),
+    academicDegree: (document.querySelector('input[name="academicDegree"]:checked') || {}).value || 'нет',
+    degreeText: val('degreeText'),
+    addEdu: (document.querySelector('input[name="addEdu"]:checked') || {}).value || 'нет',
+    addEduText: val('addEduText'),
+    license: (document.querySelector('input[name="license"]:checked') || {}).value || 'нет',
+    licenseText: val('licenseText'),
+    gossl: (document.querySelector('input[name="gossl"]:checked') || {}).value || 'нет',
+    familyStatus: val('familyStatus'),
+    military: (document.querySelector('input[name="military"]:checked') || {}).value || '',
+    militaryRank: val('militaryRank'),
+    hasCar: (document.querySelector('input[name="hasCar"]:checked') || {}).value || 'нет',
+    driver: (document.querySelector('input[name="driver"]:checked') || {}).value || 'нет',
+    otherVac: (document.querySelector('input[name="otherVac"]:checked') || {}).value || 'нет',
+    hasRelatives: (document.querySelector('input[name="hasRelatives"]:checked') || {}).value || 'нет',
+    hasPersonalAcquaintance: (document.querySelector('input[name="hasPersonalAcquaintance"]:checked') || {}).value || 'нет',
+    beneficial: (document.querySelector('input[name="beneficial"]:checked') || {}).value || 'нет',
+    beneficialText: val('beneficialText'),
+    consent: document.getElementById('consent').checked ? 'yes' : 'no'
+  };
+  // Плоские поля таблиц
+  form.querySelectorAll('input[name], textarea[name]').forEach(function (el) {
+    if (el.type === 'file' || el.type === 'radio' || el.type === 'checkbox') return;
+    if (Object.prototype.hasOwnProperty.call(p, el.name)) return;
+    p[el.name] = el.value;
+  });
+  return p;
+}
+
+function validate() {
+  var errors = [];
+  var req = [
+    ['fio','ФИО'],['passportData','Паспорт'],['birth','Дата рождения'],
+    ['birthPlace','Место рождения'],['citizenship','Гражданство'],
+    ['regAddress','Адрес регистрации'],['actualAddress','Адрес фактического проживания'],
+    ['phone','Телефон'],['email','Email'],['inn','ИНН'],['familyStatus','Семейное положение']
+  ];
+  req.forEach(function (p) {
+    var v = val(p[0]); mark(p[0], !v);
+    if (!v) errors.push('Поле "' + p[1] + '" обязательно');
+  });
+  if (val('inn') && !/^\d{12}$/.test(val('inn'))) { mark('inn', true); errors.push('ИНН: 12 цифр'); }
+  if (val('email') && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val('email'))) { mark('email', true); errors.push('Некорректный email'); }
+  if (files.length === 0) errors.push('Приложите хотя бы один документ');
+  if (!document.getElementById('consent').checked) errors.push('Необходимо дать согласие на обработку ПД');
+  return errors;
+}
+
+// ========================================================
+// ОТПРАВКА
+// ========================================================
+form.addEventListener('submit', async function (e) {
+  e.preventDefault();
+  hideStatus();
+  var errors = validate();
+  if (errors.length) {
+    showStatus('error', '<b>Исправьте:</b><br>' + errors.join('<br>'));
+    return;
+  }
+
+  var submitBtn = document.getElementById('submitBtn');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Отправка...';
+  showStatus('info', '⏳ Отправляем анкету...');
+
+  try {
+    var payload = collectPayload();
+    var token = getTokenFromUrl();
+
+    if (IS_OWN_SERVER) {
+      // ===== Режим own_server: отправляем JSON + файлы как раньше =====
+      if (!token) throw new Error('Не указан token в ссылке');
+      var fdOwn = new FormData();
+      fdOwn.append('token', token);
+      fdOwn.append('fields', JSON.stringify(payload));
+      for (var i = 0; i < files.length; i++) {
+        fdOwn.append('files', files[i], files[i].name);
+      }
+      var rOwn = await fetch(OWN_SERVER_SUBMIT, { method: 'POST', body: fdOwn });
+      if (!rOwn.ok) {
+        var tOwn = await rOwn.text();
+        throw new Error('Сервер ответил ' + rOwn.status + ': ' + tOwn);
+      }
+    } else {
+      // ===== Режим buffer: шифруем и отправляем на буфер =====
+      if (!token) throw new Error('Не указан token в ссылке');
+
+      // 1. Готовим payload с токеном
+      payload.token = token;
+
+      // 2. Шифруем payload
+      var enc = await encryptPayload(payload);
+
+      // 3. Шифруем файлы тем же AES-ключом (берём из encrypted_key — невозможно,
+      //    поэтому шифруем файлы отдельно, каждым своим ключом, но проще:
+      //    используем тот же ключ, что и для payload — для этого генерим его
+      //    в encryptPayload и возвращаем). Проще: делаем вторую функцию.
+      // Простое решение: шифруем файлы как отдельные AES-ключи, но их надо
+      // передать. Усложняет. Поэтому: файлы шифруем AES-ключом payload — но
+      // payload уже зашифрован. Экспорт AES-ключа только что был внутри.
+      // Решение: шифруем файлы отдельно каждый своим ключом, и передаём список
+      // { iv, encrypted_key, encrypted_data } per file.
+
+      var fd = new FormData();
+      fd.append('token', token);
+      fd.append('encrypted_data', enc.encrypted_data);
+      fd.append('encrypted_key', enc.encrypted_key);
+      fd.append('iv', enc.iv);
+
+      // Файлы: каждый шифруем своим AES-ключом
+      var filesMeta = [];
+      for (var j = 0; j < files.length; j++) {
+        var f = files[j];
+        var fileKey = await crypto.subtle.generateKey(
+          { name: 'AES-GCM', length: 256 }, true, ['encrypt']
+        );
+        var fileIv = crypto.getRandomValues(new Uint8Array(12));
+        var fileBuf = await f.arrayBuffer();
+        var fileCt = await crypto.subtle.encrypt(
+          { name: 'AES-GCM', iv: fileIv }, fileKey, fileBuf
+        );
+        var rawFileKey = await crypto.subtle.exportKey('raw', fileKey);
+        var rsaPub = await importRsaPublicKey();
+        var wrappedFileKey = await crypto.subtle.encrypt(
+          { name: 'RSA-OAEP' }, rsaPub, rawFileKey
+        );
+
+        filesMeta.push({
+          original_name: f.name,
+          encrypted_data: bytesToB64(fileCt),
+          encrypted_key: bytesToB64(wrappedFileKey),
+          iv: bytesToB64(fileIv)
+        });
+      }
+      fd.append('files_meta', JSON.stringify(filesMeta));
+
+      var rBuf = await fetch(BUFFER_SUBMIT, { method: 'POST', body: fd });
+      if (!rBuf.ok) {
+        var tBuf = await rBuf.text();
+        throw new Error('Буфер ответил ' + rBuf.status + ': ' + tBuf);
+      }
+    }
+
+    form.style.display = 'none';
+    showStatus('success', '<h2> Анкета отправлена!</h2><p>Ваша анкета успешно передана на обработку. Ожидайте обратной связи.</p>');
+  } catch (err) {
+    console.error(err);
+    showStatus('error', '<b>Ошибка:</b> ' + (err.message || 'неизвестная'));
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'ОТПРАВИТЬ АНКЕТУ';
+  }
+});
+
+// ========================================================
+// АВТОЗАПОЛНЕНИЕ ИЗ ДАННЫХ (buffer prefill или own_server prefill)
+// ========================================================
+function setRadio(name, value) {
+  if (value === undefined || value === null || value === '') return;
+  var el = document.querySelector('input[name="' + name + '"][value="' + value + '"]');
+  if (el) { el.checked = true; applyToggle(name, el.value); }
+}
+function setVal(id, value) {
+  var el = document.getElementById(id);
+  if (el && value !== undefined && value !== null) el.value = value;
+}
+
+function fillAnketa(data) {
+  if (!data) return;
+  setVal('fio', data.fio);
+  setVal('passportData', data.passportData);
+  setVal('birth', data.birth);
+  setVal('birthPlace', data.birthPlace);
+  setVal('citizenship', data.citizenship);
+  setVal('regAddress', data.regAddress);
+  setVal('tempRegAddress', data.tempRegAddress);
+  setVal('actualAddress', data.actualAddress);
+  setVal('phone', data.phone);
+  setVal('email', data.email);
+  setVal('inn', data.inn);
+  setVal('surnameReason', data.surnameReason);
+  setVal('eduLevel', data.eduLevel);
+  setVal('degreeText', data.degreeText);
+  setVal('addEduText', data.addEduText);
+  setVal('licenseText', data.licenseText);
+  setVal('familyStatus', data.familyStatus);
+  setVal('militaryRank', data.militaryRank);
+  setVal('beneficialText', data.beneficialText);
+
+  setRadio('surnameChanged', data.surnameChanged);
+  setRadio('academicDegree', data.academicDegree);
+  setRadio('addEdu', data.addEdu);
+  setRadio('license', data.license);
+  setRadio('gossl', data.gossl);
+  setRadio('military', data.military);
+  setRadio('hasCar', data.hasCar);
+  setRadio('driver', data.driver);
+  setRadio('otherVac', data.otherVac);
+  setRadio('hasRelatives', data.hasRelatives);
+  setRadio('hasPersonalAcquaintance', data.hasPersonalAcquaintance);
+  setRadio('beneficial', data.beneficial);
+
+  if (data.noExperience === true || data.noExperience === 'true' || data.noExperience === '1' || data.noExperience === 'on') {
+    var cb = document.getElementById('noExperience');
+    cb.checked = true;
+    cb.dispatchEvent(new Event('change'));
+  }
+
+  fillTable(data, 'edu_', ['start', 'end', 'org', 'fac', 'spec', 'qual'], addEduRow,
+    ['edu_start_', 'edu_end_', 'edu_org_', 'edu_fac_', 'edu_spec_', 'edu_qual_']);
+  fillTable(data, 'work_', ['start', 'end', 'org', 'post', 'reason'], addWorkRow,
+    ['work_start_', 'work_end_', 'work_org_', 'work_post_', 'work_reason_']);
+  fillTable(data, 'rec_', ['fio', 'work', 'title', 'phone'], addRecRow,
+    ['rec_fio_', 'rec_work_', 'rec_title_', 'rec_phone_']);
+  fillTable(data, 'gossl_', ['period_from', 'period_to', 'position', 'org', 'date'], addGosslRow,
+    ['gossl_period_from_', 'gossl_period_to_', 'gossl_position_', 'gossl_org_', 'gossl_date_']);
+  fillTable(data, 'fam_', ['rel', 'fio', 'birth', 'work', 'position'], addFamilyRow,
+    ['fam_rel_', 'fam_fio_', 'fam_birth_', 'fam_work_', 'fam_position_']);
+  fillTable(data, 'other_vac_', ['name', 'period'], addOtherVacRow,
+    ['other_vac_name_', 'other_vac_period_']);
+  fillTable(data, 'relatives_', ['fio', 'position', 'relation'], addRelativesRow,
+    ['relatives_fio_', 'relatives_position_', 'relatives_relation_']);
+  fillTable(data, 'personal_', ['fio', 'position', 'circumstances'], addAcquaintancesRow,
+    ['personal_fio_', 'personal_position_', 'personal_circumstances_']);
+
+  setTimeout(function () {
+    var bEl = document.getElementById('birth');
+    if (bEl) formatDateStr(bEl);
+    var pEl = document.getElementById('phone');
+    if (pEl) formatPhone(pEl);
+    var iEl = document.getElementById('inn');
+    if (iEl) iEl.value = iEl.value.replace(/\D/g, '');
+    document.querySelectorAll('[name^="work_start_"], [name^="gossl_period_from_"], [name^="gossl_period_to_"]').forEach(function (el) {
+      formatMonthYear(el);
+    });
+    document.querySelectorAll('[name^="gossl_date_"], [name^="fam_birth_"]').forEach(function (el) {
+      formatDateStr(el);
+    });
+    document.querySelectorAll('[name^="rec_phone_"]').forEach(function (el) {
+      formatPhone(el);
+    });
+  }, 50);
+}
+
+function fillTable(data, prefix, keys, addRowFn, namePrefixes) {
+  var indicesSet = {};
+  for (var k in data) {
+    if (k.indexOf(prefix) !== 0) continue;
+    var parts = k.split('_');
+    var idx = parseInt(parts[parts.length - 1], 10);
+    if (!isNaN(idx)) indicesSet[idx] = true;
+  }
+  var indices = Object.keys(indicesSet).map(function (x) { return parseInt(x, 10); });
+  if (indices.length === 0) return;
+
+  var tbodyId = '';
+  if (prefix === 'edu_') tbodyId = 'eduBody';
+  else if (prefix === 'work_') tbodyId = 'workBody';
+  else if (prefix === 'rec_') tbodyId = 'recBody';
+  else if (prefix === 'gossl_') tbodyId = 'gosslBody';
+  else if (prefix === 'fam_') tbodyId = 'familyBody';
+  else if (prefix === 'other_vac_') tbodyId = 'otherVacBody';
+  else if (prefix === 'relatives_') tbodyId = 'relativesBody';
+  else if (prefix === 'personal_') tbodyId = 'acquaintancesBody';
+  if (tbodyId) {
+    var tb = document.getElementById(tbodyId);
+    if (tb) tb.innerHTML = '';
+  }
+
+  indices.sort(function (a, b) { return a - b; });
+
+  indices.forEach(function (realIdx) {
+    var tr = addRowFn();
+    keys.forEach(function (key, keyIdx) {
+      var correctName = namePrefixes[keyIdx] + realIdx;
+      var el = tr.querySelector('[name^="' + namePrefixes[keyIdx] + '"]');
+      if (el) {
+        el.name = correctName;
+        el.value = data[correctName] || '';
+        if (el.tagName === 'TEXTAREA') setTimeout(function () { autoResize(el); }, 10);
+      }
+    });
+  });
+}
+
+// ========================================================
+// ЗАГРУЗКА PREFILL
+// ========================================================
+async function loadPrefill() {
+  var token = getTokenFromUrl();
+  if (!token) return;
+
+  // Сохраняем id в hidden — используется при отправке
+  document.getElementById('candidateId').value = token;
+
+  var keyB64 = getKeyFromUrlOrStorage(token);
+
+  try {
+    var prefillUrl = IS_OWN_SERVER
+      ? (OWN_SERVER_PREFILL + '?token=' + encodeURIComponent(token))
+      : (BUFFER_PREFILL + '?token=' + encodeURIComponent(token));
+
+    var r = await fetch(prefillUrl);
+    if (r.status === 404) return;   // первичная отправка — prefill нет — пустая форма
+    if (!r.ok) return;
+
+    var data = await r.json();
+
+    if (IS_BUFFER_MODE) {
+      // prefill зашифрован — расшифровываем ключом из #k=
+      if (!keyB64) {
+        document.getElementById('prefillMissingBanner').classList.add('visible');
+        return;
+      }
+      try {
+        var plainJson = await decryptPayload(data.encrypted, data.iv, keyB64);
+        var payload = JSON.parse(plainJson);
+        fillAnketa(payload);
+        if (payload._remarks) showRemarks(payload._remarks);
+      } catch (e) {
+        console.error('prefill decrypt failed', e);
+        document.getElementById('prefillMissingBanner').classList.add('visible');
+      }
+    } else {
+      // own_server — backend вернул расшифрованные данные
+      if (data.fields) fillAnketa(data.fields);
+      if (data.remarks) showRemarks(data.remarks);
+    }
+  } catch (e) {
+    console.error('prefill failed', e);
+  }
+}
+
+// ========================================================
+// КНОПКА "ЗАПРОСИТЬ ССЫЛКУ ЗАНОВО"
+// ========================================================
+document.getElementById('resendLinkBtn').addEventListener('click', async function () {
+  var token = getTokenFromUrl();
+  if (!token) { alert('Нет токена в ссылке'); return; }
+  this.disabled = true;
+  this.textContent = 'Отправка...';
+  try {
+    var r = await fetch(RESEND_LINK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: token })
+    });
+    if (r.ok) {
+      this.textContent = '✓ Отправлено';
+      alert('Ссылка отправлена на вашу почту. Проверьте в течение 1–2 минут.');
+    } else {
+      this.disabled = false;
+      this.textContent = 'Запросить ссылку заново';
+      alert('Не удалось отправить. Обратитесь в отдел кадров.');
+    }
+  } catch (e) {
+    this.disabled = false;
+    this.textContent = 'Запросить ссылку заново';
+    alert('Ошибка: ' + e.message);
+  }
+});
+
+// ========================================================
+// СТАРТ
+// ========================================================
+loadPrefill();
+
+})();
+</script>
+
+</body>
+</html>
