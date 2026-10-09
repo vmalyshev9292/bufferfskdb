@@ -720,6 +720,8 @@ function getKeyFromUrlOrStorage(token) {
 // BASE64 / ARRAYBUFFER
 // ========================================================
 function b64ToBytes(b64) {
+  // base64url → base64 (atob не понимает - и _)
+  b64 = b64.replace(/-/g, '+').replace(/_/g, '/');
   var pad = b64.length % 4;
   if (pad) b64 += '='.repeat(4 - pad);
   var bin = atob(b64);
