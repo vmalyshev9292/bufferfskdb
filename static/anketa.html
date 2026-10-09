@@ -1404,45 +1404,26 @@ function fillTable(data, prefix, keys, addRowFn, namePrefixes) {
 async function loadPrefill() {
   var token = getTokenFromUrl();
   if (!token) return;
-
-  // Сохраняем id в hidden — используется при отправке
   document.getElementById('candidateId').value = token;
 
-  var keyB64 = getKeyFromUrlOrStorage(token);
+  var k = getHashParam('k');
+  var i = getHashParam('i');
+  var d = getHashParam('d');
+
+  if (!k || !i || !d) {
+    // Нет prefill — это первичная отправка, форма пустая. Всё ок.
+    return;
+  }
 
   try {
-    var prefillUrl = IS_OWN_SERVER
-      ? (OWN_SERVER_PREFILL + '?token=' + encodeURIComponent(token))
-      : (BUFFER_PREFILL + '?token=' + encodeURIComponent(token));
-
-    var r = await fetch(prefillUrl);
-    if (r.status === 404) return;   // первичная отправка — prefill нет — пустая форма
-    if (!r.ok) return;
-
-    var data = await r.json();
-
-    if (IS_BUFFER_MODE) {
-      // prefill зашифрован — расшифровываем ключом из #k=
-      if (!keyB64) {
-        document.getElementById('prefillMissingBanner').classList.add('visible');
-        return;
-      }
-      try {
-        var plainJson = await decryptPayload(data.encrypted, data.iv, keyB64);
-        var payload = JSON.parse(plainJson);
-        fillAnketa(payload);
-        if (payload._remarks) showRemarks(payload._remarks);
-      } catch (e) {
-        console.error('prefill decrypt failed', e);
-        document.getElementById('prefillMissingBanner').classList.add('visible');
-      }
-    } else {
-      // own_server — backend вернул расшифрованные данные
-      if (data.fields) fillAnketa(data.fields);
-      if (data.remarks) showRemarks(data.remarks);
-    }
+    var plainJson = await decryptPayload(d, i, k);
+    var payload = JSON.parse(plainJson);
+    fillAnketa(payload);
+    if (payload._remarks) showRemarks(payload._remarks);
   } catch (e) {
-    console.error('prefill failed', e);
+    console.error('prefill decrypt failed', e);
+    var banner = document.getElementById('prefillMissingBanner');
+    if (banner) banner.classList.add('visible');
   }
 }
 
