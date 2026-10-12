@@ -578,8 +578,8 @@
       <input type="file" id="fileInput" multiple accept=".pdf,.jpg,.jpeg,.png" style="display:none;">
       <button type="button" class="upload-btn-large" id="uploadBtnLarge">➕ Добавить файлы</button>
       <div class="files-hint" style="font-size:13px;color:#6c757d;margin:8px 0;">
-        PDF, JPG или PNG. До 5 файлов. До 2 МБ на файл, суммарно до 6 МБ.
-        Фото с телефона сжимаются автоматически.
+        PDF, JPG или PNG. До 5 файлов, суммарно до 700 КБ.
+        Фото с телефона автоматически сжимаются до нужного размера.
       </div>
       <div id="filesList" class="files-list"></div>
       <div id="filesErrors" style="display:none;margin-top:12px;padding:14px 18px;background:#fdecea;border:1px solid #f5c6cb;border-left:6px solid #dc3545;border-radius:8px;color:#b33;font-size:14px;line-height:1.5;"></div>
@@ -1026,15 +1026,14 @@ document.getElementById('noExperience').addEventListener('change', function () {
     inputs.forEach(function (el) { el.disabled = false; });
   }
 });
-
 // ========================================================
-// ФАЙЛЫ — проверка размера/формата + автосжатие картинок
+// ФАЙЛЫ — жёсткая проверка + автосжатие под лимит буфера
 // ========================================================
-var MAX_FILE_SIZE_MB = 2;
-var MAX_TOTAL_SIZE_MB = 6;
+var MAX_FILE_SIZE_MB = 1;      // на один файл (после сжатия)
+var MAX_TOTAL_SIZE_MB = 0.7;   // всего на все файлы (после сжатия) — под лимит буфера
 var MAX_FILES_COUNT = 5;
-var IMG_MAX_SIDE = 1400;
-var IMG_QUALITY = 0.78;
+var IMG_MAX_SIDE = 1000;
+var IMG_QUALITY = 0.55;
 
 var files = [];
 var fileInput = document.getElementById('fileInput');
@@ -1047,14 +1046,17 @@ function getFileExt(name) {
 function humanSize(bytes) {
   if (!bytes && bytes !== 0) return '—';
   if (bytes < 1024) return bytes + ' Б';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' КБ';
-  return (bytes / (1024 * 1024)).toFixed(1) + ' МБ';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' КБ';
+  return (bytes / (1024 * 1024)).toFixed(2) + ' МБ';
+}
+function totalFilesSize() {
+  return files.reduce(function (s, x) { return s + (x.size || 0); }, 0);
 }
 function showFilesErrors(errors) {
   var el = document.getElementById('filesErrors');
   if (!el) return;
   if (!errors || !errors.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
-  el.innerHTML = '<b>Не удалось добавить файлы:</b><br>' +
+  el.innerHTML = '<b>Файл не добавлен:</b><br>' +
     errors.map(function (x) { return '• ' + x; }).join('<br>');
   el.style.display = 'block';
 }
@@ -1074,62 +1076,38 @@ function isPdfFile(file) {
   return ext === '.pdf' || file.type === 'application/pdf';
 }
 
-/**
- * Пытается сжать картинку через canvas.
- * Кидает Error с понятной причиной, если не удалось.
- */
 async function compressImage(file) {
   var ext = getFileExt(file.name);
   var bitmap = null;
-  var lastErr = null;
 
-  // 1. createImageBitmap (Chrome / Firefox / Edge). Safari — не поддерживает опции.
   if (typeof createImageBitmap === 'function') {
     try {
       bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
     } catch (e1) {
-      lastErr = e1;
-      try {
-        bitmap = await createImageBitmap(file);
-      } catch (e2) {
-        lastErr = e2;
-        bitmap = null;
-      }
+      try { bitmap = await createImageBitmap(file); } catch (e2) { bitmap = null; }
     }
   }
 
-  // 2. Fallback через <img> (Safari iOS и старые браузеры)
   if (!bitmap) {
     try {
       bitmap = await new Promise(function (resolve, reject) {
         var img = new Image();
         var url = URL.createObjectURL(file);
-        img.onload = function () {
-          URL.revokeObjectURL(url);
-          resolve(img);
-        };
-        img.onerror = function () {
-          URL.revokeObjectURL(url);
-          reject(new Error('браузер не смог открыть это фото'));
-        };
+        img.onload = function () { URL.revokeObjectURL(url); resolve(img); };
+        img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('не читается')); };
         img.src = url;
       });
     } catch (e3) {
-      lastErr = e3;
-      // Дадим понятную причину
       if (ext === '.heic' || ext === '.heif') {
-        throw new Error('фото в формате HEIC — iPhone-снимок. Сохраните его как JPG ' +
-          '(Настройки iPhone → Камера → Форматы → «Наиболее совместимый») ' +
-          'или загрузите файл с компьютера');
+        throw new Error('формат HEIC (снимок iPhone). Сохраните как JPG: Настройки → Камера → Форматы → «Наиболее совместимый»');
       }
-      throw new Error('браузер не смог открыть это фото (' +
-        (lastErr && lastErr.message ? lastErr.message : 'неизвестная причина') + ')');
+      throw new Error('браузер не смог открыть фото');
     }
   }
 
   var w = bitmap.width || bitmap.naturalWidth || 0;
   var h = bitmap.height || bitmap.naturalHeight || 0;
-  if (!w || !h) throw new Error('фото повреждено или пустое');
+  if (!w || !h) throw new Error('фото повреждено');
 
   var scale = 1;
   if (Math.max(w, h) > IMG_MAX_SIDE) scale = IMG_MAX_SIDE / Math.max(w, h);
@@ -1140,7 +1118,7 @@ async function compressImage(file) {
   canvas.width = tw;
   canvas.height = th;
   var ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('браузер не поддерживает сжатие изображений');
+  if (!ctx) throw new Error('сжатие не поддерживается браузером');
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, tw, th);
   ctx.drawImage(bitmap, 0, 0, tw, th);
@@ -1148,12 +1126,7 @@ async function compressImage(file) {
   var blob = await new Promise(function (resolve) {
     canvas.toBlob(resolve, 'image/jpeg', IMG_QUALITY);
   });
-  if (!blob || !blob.size) {
-    if (ext === '.heic' || ext === '.heif') {
-      throw new Error('не удалось сжать HEIC-фото. Сохраните как JPG или загрузите с компьютера');
-    }
-    throw new Error('не удалось сжать фото (canvas вернул пустой результат)');
-  }
+  if (!blob || !blob.size) throw new Error('не удалось сжать фото');
 
   var baseName = (file.name || 'photo').replace(/\.[^.]+$/, '') || 'photo';
   var newName = baseName + '.jpg';
@@ -1161,7 +1134,6 @@ async function compressImage(file) {
   try {
     return new File([blob], newName, { type: 'image/jpeg', lastModified: Date.now() });
   } catch (e) {
-    // Очень старые браузеры — используем blob с именем
     blob.name = newName;
     return blob;
   }
@@ -1173,13 +1145,12 @@ async function processFile(f, errors) {
   var sizeTxt = humanSize(f.size);
 
   if (!isImg && !isPdf) {
-    errors.push('«' + f.name + '» (' + sizeTxt + '): недопустимый формат. ' +
-      'Разрешены только PDF, JPG, PNG.');
+    errors.push('«' + f.name + '» (' + sizeTxt + '): формат не поддерживается. Разрешены только PDF, JPG, PNG.');
     return null;
   }
 
   if (files.length >= MAX_FILES_COUNT) {
-    errors.push('Уже выбрано максимум ' + MAX_FILES_COUNT + ' файлов.');
+    errors.push('Уже добавлено ' + MAX_FILES_COUNT + ' файлов (максимум).');
     return null;
   }
 
@@ -1189,39 +1160,42 @@ async function processFile(f, errors) {
     try {
       finalFile = await compressImage(f);
     } catch (e) {
-      // Сжатие не удалось — оставляем оригинал, но проверим размер ниже.
-      console.warn('compressImage failed:', e);
-      finalFile = f;
-      // Если оригинал HEIC — точно не пройдёт в buffer-режиме. Сообщим сразу.
-      var ext = getFileExt(f.name);
-      if ((ext === '.heic' || ext === '.heif') && f.size > 500 * 1024) {
-        errors.push('«' + f.name + '» (' + sizeTxt + '): ' +
-          (e && e.message ? e.message : 'фото в формате HEIC слишком большое'));
-        return null;
-      }
+      errors.push('«' + f.name + '» (' + sizeTxt + '): ' + (e && e.message ? e.message : 'не удалось обработать фото'));
+      return null;
     }
   }
 
-  var finalSizeTxt = humanSize(finalFile.size);
-  var sizeMb = finalFile.size / (1024 * 1024);
-  if (sizeMb > MAX_FILE_SIZE_MB) {
-    errors.push('«' + f.name + '» (' + finalSizeTxt + '): больше ' + MAX_FILE_SIZE_MB +
-      ' МБ. Уменьшите размер фото. Простой способ: отправьте фото себе в WhatsApp ' +
-      'или Telegram — мессенджер сожмёт его — и загрузите сжатый вариант.');
+  var finalSize = finalFile.size || 0;
+  var finalSizeTxt = humanSize(finalSize);
+
+  if (finalSize > MAX_FILE_SIZE_MB * 1024 * 1024) {
+    if (isPdf) {
+      errors.push('«' + f.name + '» (' + finalSizeTxt + '): PDF больше ' + MAX_FILE_SIZE_MB +
+        ' МБ. Уменьшите PDF (сжать в Adobe / ILovePDF) или загрузите снимки страниц.');
+    } else {
+      errors.push('«' + f.name + '»: после сжатия всё ещё ' + finalSizeTxt +
+        ' (лимит ' + MAX_FILE_SIZE_MB + ' МБ). Попробуйте другое фото или сделайте снимок заново.');
+    }
     return null;
   }
 
-  var currentTotal = files.reduce(function (s, x) { return s + (x.size || 0); }, 0);
-  if (currentTotal + finalFile.size > MAX_TOTAL_SIZE_MB * 1024 * 1024) {
-    errors.push('Общий размер всех файлов превысит ' + MAX_TOTAL_SIZE_MB +
-      ' МБ. Удалите один из уже добавленных файлов.');
+  var currentTotal = totalFilesSize();
+  if (currentTotal + finalSize > MAX_TOTAL_SIZE_MB * 1024 * 1024) {
+    var remain = (MAX_TOTAL_SIZE_MB * 1024 * 1024) - currentTotal;
+    errors.push('«' + f.name + '» (' + finalSizeTxt + ') не помещается: всего можно до ' +
+      humanSize(MAX_TOTAL_SIZE_MB * 1024 * 1024) + ', уже занято ' +
+      humanSize(currentTotal) + ', осталось ' + humanSize(Math.max(0, remain)) + '. ' +
+      'Удалите лишние файлы.');
     return null;
   }
 
   var dup = files.some(function (x) {
     return x.name === finalFile.name && x.size === finalFile.size;
   });
-  if (dup) return null;
+  if (dup) {
+    errors.push('«' + f.name + '» уже добавлен.');
+    return null;
+  }
 
   return finalFile;
 }
@@ -1233,7 +1207,6 @@ document.getElementById('uploadBtnLarge').addEventListener('click', function () 
 fileInput.addEventListener('change', async function (e) {
   var list = Array.prototype.slice.call(e.target.files || []);
   e.target.value = '';
-
   if (!list.length) return;
 
   var errors = [];
@@ -1243,16 +1216,13 @@ fileInput.addEventListener('change', async function (e) {
 
   try {
     for (var idx = 0; idx < list.length; idx++) {
-      var current = list[idx];
       try {
-        var processed = await processFile(current, errors);
+        var processed = await processFile(list[idx], errors);
         if (processed) files.push(processed);
       } catch (err) {
-        // Совсем крайний случай — processFile сам не должен бросать, но если бросил
         console.warn('processFile threw:', err);
-        var errMsg = (err && err.message) ? String(err.message) : 'неизвестно';
-        errors.push('«' + (current && current.name ? current.name : 'файл') + '» (' +
-          (current ? humanSize(current.size) : '—') + '): ' + errMsg);
+        var errMsg = (err && err.message) ? String(err.message) : 'неизвестная ошибка';
+        errors.push('«' + (list[idx] ? list[idx].name : 'файл') + '»: ' + errMsg);
       }
     }
   } finally {
@@ -1282,8 +1252,23 @@ function renderFiles() {
     div.appendChild(span); div.appendChild(btn);
     filesList.appendChild(div);
   });
-}
 
+  // Показываем «всего: X из Y» под списком
+  var total = totalFilesSize();
+  var sumEl = document.getElementById('filesSummary');
+  if (!sumEl) {
+    sumEl = document.createElement('div');
+    sumEl.id = 'filesSummary';
+    sumEl.style.cssText = 'margin-top:8px;font-size:13px;color:#6c757d;';
+    filesList.parentNode.insertBefore(sumEl, filesList.nextSibling);
+  }
+  if (files.length) {
+    sumEl.textContent = 'Всего: ' + humanSize(total) + ' из ' +
+      humanSize(MAX_TOTAL_SIZE_MB * 1024 * 1024) + ' (' + files.length + '/' + MAX_FILES_COUNT + ' файлов)';
+  } else {
+    sumEl.textContent = '';
+  }
+}
 // ========================================================
 // МОДАЛКА СОГЛАСИЯ
 // ========================================================
