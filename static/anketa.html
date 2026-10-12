@@ -1030,10 +1030,11 @@ document.getElementById('noExperience').addEventListener('change', function () {
 // ========================================================
 // ФАЙЛЫ — проверка размера/формата + автосжатие картинок
 // ========================================================
-var MAX_FILE_SIZE_MB = 2;      // было 4 — с запасом под base64 + payload
-var MAX_TOTAL_SIZE_MB = 6;     // было 15 — укладываемся в 1 МБ nginx
-var IMG_MAX_SIDE = 1400;       // было 1600
-var IMG_QUALITY = 0.78;        // было 0.85 — картинка ~150–250 КБ вместо 600
+var MAX_FILE_SIZE_MB = 2;
+var MAX_TOTAL_SIZE_MB = 6;
+var MAX_FILES_COUNT = 5;
+var IMG_MAX_SIDE = 1400;
+var IMG_QUALITY = 0.78;
 
 var files = [];
 var fileInput = document.getElementById('fileInput');
@@ -1044,6 +1045,7 @@ function getFileExt(name) {
   return i >= 0 ? String(name).slice(i).toLowerCase() : '';
 }
 function humanSize(bytes) {
+  if (!bytes && bytes !== 0) return '—';
   if (bytes < 1024) return bytes + ' Б';
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' КБ';
   return (bytes / (1024 * 1024)).toFixed(1) + ' МБ';
@@ -1072,42 +1074,73 @@ function isPdfFile(file) {
   return ext === '.pdf' || file.type === 'application/pdf';
 }
 
+/**
+ * Пытается сжать картинку через canvas.
+ * Кидает Error с понятной причиной, если не удалось.
+ */
 async function compressImage(file) {
+  var ext = getFileExt(file.name);
   var bitmap = null;
+  var lastErr = null;
 
-  // 1. Пытаемся через createImageBitmap (Chrome, Firefox, Edge)
+  // 1. createImageBitmap (Chrome / Firefox / Edge). Safari — не поддерживает опции.
   if (typeof createImageBitmap === 'function') {
     try {
       bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
     } catch (e1) {
-      try { bitmap = await createImageBitmap(file); } catch (e2) { bitmap = null; }
+      lastErr = e1;
+      try {
+        bitmap = await createImageBitmap(file);
+      } catch (e2) {
+        lastErr = e2;
+        bitmap = null;
+      }
     }
   }
 
-  // 2. Fallback через <img> (Safari, старые браузеры)
+  // 2. Fallback через <img> (Safari iOS и старые браузеры)
   if (!bitmap) {
-    bitmap = await new Promise(function (resolve, reject) {
-      var img = new Image();
-      var url = URL.createObjectURL(file);
-      img.onload = function () { URL.revokeObjectURL(url); resolve(img); };
-      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('не удалось прочитать картинку')); };
-      img.src = url;
-    });
+    try {
+      bitmap = await new Promise(function (resolve, reject) {
+        var img = new Image();
+        var url = URL.createObjectURL(file);
+        img.onload = function () {
+          URL.revokeObjectURL(url);
+          resolve(img);
+        };
+        img.onerror = function () {
+          URL.revokeObjectURL(url);
+          reject(new Error('браузер не смог открыть это фото'));
+        };
+        img.src = url;
+      });
+    } catch (e3) {
+      lastErr = e3;
+      // Дадим понятную причину
+      if (ext === '.heic' || ext === '.heif') {
+        throw new Error('фото в формате HEIC — iPhone-снимок. Сохраните его как JPG ' +
+          '(Настройки iPhone → Камера → Форматы → «Наиболее совместимый») ' +
+          'или загрузите файл с компьютера');
+      }
+      throw new Error('браузер не смог открыть это фото (' +
+        (lastErr && lastErr.message ? lastErr.message : 'неизвестная причина') + ')');
+    }
   }
 
-  var w = bitmap.width || bitmap.naturalWidth;
-  var h = bitmap.height || bitmap.naturalHeight;
-  if (!w || !h) throw new Error('картинка повреждена');
+  var w = bitmap.width || bitmap.naturalWidth || 0;
+  var h = bitmap.height || bitmap.naturalHeight || 0;
+  if (!w || !h) throw new Error('фото повреждено или пустое');
 
   var scale = 1;
   if (Math.max(w, h) > IMG_MAX_SIDE) scale = IMG_MAX_SIDE / Math.max(w, h);
-  var tw = Math.round(w * scale);
-  var th = Math.round(h * scale);
+  var tw = Math.max(1, Math.round(w * scale));
+  var th = Math.max(1, Math.round(h * scale));
 
   var canvas = document.createElement('canvas');
   canvas.width = tw;
   canvas.height = th;
   var ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('браузер не поддерживает сжатие изображений');
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, tw, th);
   ctx.drawImage(bitmap, 0, 0, tw, th);
@@ -1115,15 +1148,20 @@ async function compressImage(file) {
   var blob = await new Promise(function (resolve) {
     canvas.toBlob(resolve, 'image/jpeg', IMG_QUALITY);
   });
-  if (!blob) throw new Error('не удалось сохранить картинку');
+  if (!blob || !blob.size) {
+    if (ext === '.heic' || ext === '.heif') {
+      throw new Error('не удалось сжать HEIC-фото. Сохраните как JPG или загрузите с компьютера');
+    }
+    throw new Error('не удалось сжать фото (canvas вернул пустой результат)');
+  }
 
   var baseName = (file.name || 'photo').replace(/\.[^.]+$/, '') || 'photo';
   var newName = baseName + '.jpg';
 
-  // File-конструктор есть во всех актуальных браузерах. Fallback — на blob
   try {
     return new File([blob], newName, { type: 'image/jpeg', lastModified: Date.now() });
   } catch (e) {
+    // Очень старые браузеры — используем blob с именем
     blob.name = newName;
     return blob;
   }
@@ -1132,9 +1170,11 @@ async function compressImage(file) {
 async function processFile(f, errors) {
   var isImg = isImageFile(f);
   var isPdf = isPdfFile(f);
+  var sizeTxt = humanSize(f.size);
 
   if (!isImg && !isPdf) {
-    errors.push('«' + f.name + '»: недопустимый формат. Разрешены PDF, JPG, PNG.');
+    errors.push('«' + f.name + '» (' + sizeTxt + '): недопустимый формат. ' +
+      'Разрешены только PDF, JPG, PNG.');
     return null;
   }
 
@@ -1149,22 +1189,32 @@ async function processFile(f, errors) {
     try {
       finalFile = await compressImage(f);
     } catch (e) {
-      console.warn('compressImage failed, fallback to original:', e);
+      // Сжатие не удалось — оставляем оригинал, но проверим размер ниже.
+      console.warn('compressImage failed:', e);
       finalFile = f;
+      // Если оригинал HEIC — точно не пройдёт в buffer-режиме. Сообщим сразу.
+      var ext = getFileExt(f.name);
+      if ((ext === '.heic' || ext === '.heif') && f.size > 500 * 1024) {
+        errors.push('«' + f.name + '» (' + sizeTxt + '): ' +
+          (e && e.message ? e.message : 'фото в формате HEIC слишком большое'));
+        return null;
+      }
     }
   }
 
+  var finalSizeTxt = humanSize(finalFile.size);
   var sizeMb = finalFile.size / (1024 * 1024);
   if (sizeMb > MAX_FILE_SIZE_MB) {
-    errors.push('«' + f.name + '» (' + humanSize(finalFile.size) + '): больше ' +
-      MAX_FILE_SIZE_MB + ' МБ. Сожмите файл или сделайте фото меньшего размера.');
+    errors.push('«' + f.name + '» (' + finalSizeTxt + '): больше ' + MAX_FILE_SIZE_MB +
+      ' МБ. Уменьшите размер фото. Простой способ: отправьте фото себе в WhatsApp ' +
+      'или Telegram — мессенджер сожмёт его — и загрузите сжатый вариант.');
     return null;
   }
 
   var currentTotal = files.reduce(function (s, x) { return s + (x.size || 0); }, 0);
   if (currentTotal + finalFile.size > MAX_TOTAL_SIZE_MB * 1024 * 1024) {
-    errors.push('Общий размер файлов превысит ' + MAX_TOTAL_SIZE_MB +
-      ' МБ. Удалите что-то или сожмите файлы.');
+    errors.push('Общий размер всех файлов превысит ' + MAX_TOTAL_SIZE_MB +
+      ' МБ. Удалите один из уже добавленных файлов.');
     return null;
   }
 
@@ -1193,23 +1243,16 @@ fileInput.addEventListener('change', async function (e) {
 
   try {
     for (var idx = 0; idx < list.length; idx++) {
+      var current = list[idx];
       try {
-        var processed = await processFile(list[idx], errors);
+        var processed = await processFile(current, errors);
         if (processed) files.push(processed);
       } catch (err) {
-        console.warn('processFile error:', err);
-        // Полный fallback: принимаем оригинал, если он в пределах лимитов
-        var raw = list[idx];
-        if (raw && raw.size && raw.size <= MAX_FILE_SIZE_MB * 1024 * 1024) {
-          var curTotal = files.reduce(function (s, x) { return s + (x.size || 0); }, 0);
-          if (curTotal + raw.size <= MAX_TOTAL_SIZE_MB * 1024 * 1024) {
-            files.push(raw);
-          } else {
-            errors.push('«' + raw.name + '»: превышен общий размер');
-          }
-        } else {
-          errors.push('«' + (raw ? raw.name : 'файл') + '»: ошибка обработки');
-        }
+        // Совсем крайний случай — processFile сам не должен бросать, но если бросил
+        console.warn('processFile threw:', err);
+        var errMsg = (err && err.message) ? String(err.message) : 'неизвестно';
+        errors.push('«' + (current && current.name ? current.name : 'файл') + '» (' +
+          (current ? humanSize(current.size) : '—') + '): ' + errMsg);
       }
     }
   } finally {
