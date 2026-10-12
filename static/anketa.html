@@ -578,7 +578,7 @@
       <input type="file" id="fileInput" multiple accept=".pdf,.jpg,.jpeg,.png" style="display:none;">
       <button type="button" class="upload-btn-large" id="uploadBtnLarge">➕ Добавить файлы</button>
       <div class="files-hint" style="font-size:13px;color:#6c757d;margin:8px 0;">
-        PDF, JPG или PNG. До 5 файлов. До 4 МБ на файл, суммарно до 15 МБ.
+        PDF, JPG или PNG. До 5 файлов. До 2 МБ на файл, суммарно до 6 МБ.
         Фото с телефона сжимаются автоматически.
       </div>
       <div id="filesList" class="files-list"></div>
@@ -1030,11 +1030,10 @@ document.getElementById('noExperience').addEventListener('change', function () {
 // ========================================================
 // ФАЙЛЫ — проверка размера/формата + автосжатие картинок
 // ========================================================
-var MAX_FILE_SIZE_MB = 4;
-var MAX_TOTAL_SIZE_MB = 15;
-var MAX_FILES_COUNT = 5;
-var IMG_MAX_SIDE = 1600;
-var IMG_QUALITY = 0.85;
+var MAX_FILE_SIZE_MB = 2;      // было 4 — с запасом под base64 + payload
+var MAX_TOTAL_SIZE_MB = 6;     // было 15 — укладываемся в 1 МБ nginx
+var IMG_MAX_SIDE = 1400;       // было 1600
+var IMG_QUALITY = 0.78;        // было 0.85 — картинка ~150–250 КБ вместо 600
 
 var files = [];
 var fileInput = document.getElementById('fileInput');
