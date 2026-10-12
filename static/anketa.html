@@ -577,7 +577,12 @@
 
       <input type="file" id="fileInput" multiple accept=".pdf,.jpg,.jpeg,.png" style="display:none;">
       <button type="button" class="upload-btn-large" id="uploadBtnLarge">➕ Добавить файлы</button>
+      <div class="files-hint" style="font-size:13px;color:#6c757d;margin:8px 0;">
+        PDF, JPG или PNG. До 5 файлов. До 4 МБ на файл, суммарно до 15 МБ.
+        Фото с телефона сжимаются автоматически.
+      </div>
       <div id="filesList" class="files-list"></div>
+      <div id="filesErrors" style="display:none;margin-top:12px;padding:14px 18px;background:#fdecea;border:1px solid #f5c6cb;border-left:6px solid #dc3545;border-radius:8px;color:#b33;font-size:14px;line-height:1.5;"></div>
     </fieldset>
 
     <!-- ============ СОГЛАСИЕ ============ -->
@@ -1023,35 +1028,215 @@ document.getElementById('noExperience').addEventListener('change', function () {
 });
 
 // ========================================================
-// ФАЙЛЫ
+// ФАЙЛЫ — проверка размера/формата + автосжатие картинок
 // ========================================================
+var MAX_FILE_SIZE_MB = 4;
+var MAX_TOTAL_SIZE_MB = 15;
+var MAX_FILES_COUNT = 5;
+var IMG_MAX_SIDE = 1600;
+var IMG_QUALITY = 0.85;
+
 var files = [];
 var fileInput = document.getElementById('fileInput');
 var filesList = document.getElementById('filesList');
 
+function getFileExt(name) {
+  var i = String(name || '').lastIndexOf('.');
+  return i >= 0 ? String(name).slice(i).toLowerCase() : '';
+}
+function humanSize(bytes) {
+  if (bytes < 1024) return bytes + ' Б';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' КБ';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' МБ';
+}
+function showFilesErrors(errors) {
+  var el = document.getElementById('filesErrors');
+  if (!el) return;
+  if (!errors || !errors.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.innerHTML = '<b>Не удалось добавить файлы:</b><br>' +
+    errors.map(function (x) { return '• ' + x; }).join('<br>');
+  el.style.display = 'block';
+}
+function hideFilesErrors() {
+  var el = document.getElementById('filesErrors');
+  if (el) { el.style.display = 'none'; el.innerHTML = ''; }
+}
+
+function isImageFile(file) {
+  var ext = getFileExt(file.name);
+  if (['.jpg', '.jpeg', '.png', '.heic', '.heif', '.webp'].indexOf(ext) >= 0) return true;
+  if (file.type && /^image\//i.test(file.type)) return true;
+  return false;
+}
+function isPdfFile(file) {
+  var ext = getFileExt(file.name);
+  return ext === '.pdf' || file.type === 'application/pdf';
+}
+
+async function compressImage(file) {
+  var bitmap = null;
+
+  // 1. Пытаемся через createImageBitmap (Chrome, Firefox, Edge)
+  if (typeof createImageBitmap === 'function') {
+    try {
+      bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    } catch (e1) {
+      try { bitmap = await createImageBitmap(file); } catch (e2) { bitmap = null; }
+    }
+  }
+
+  // 2. Fallback через <img> (Safari, старые браузеры)
+  if (!bitmap) {
+    bitmap = await new Promise(function (resolve, reject) {
+      var img = new Image();
+      var url = URL.createObjectURL(file);
+      img.onload = function () { URL.revokeObjectURL(url); resolve(img); };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('не удалось прочитать картинку')); };
+      img.src = url;
+    });
+  }
+
+  var w = bitmap.width || bitmap.naturalWidth;
+  var h = bitmap.height || bitmap.naturalHeight;
+  if (!w || !h) throw new Error('картинка повреждена');
+
+  var scale = 1;
+  if (Math.max(w, h) > IMG_MAX_SIDE) scale = IMG_MAX_SIDE / Math.max(w, h);
+  var tw = Math.round(w * scale);
+  var th = Math.round(h * scale);
+
+  var canvas = document.createElement('canvas');
+  canvas.width = tw;
+  canvas.height = th;
+  var ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, tw, th);
+  ctx.drawImage(bitmap, 0, 0, tw, th);
+
+  var blob = await new Promise(function (resolve) {
+    canvas.toBlob(resolve, 'image/jpeg', IMG_QUALITY);
+  });
+  if (!blob) throw new Error('не удалось сохранить картинку');
+
+  var baseName = (file.name || 'photo').replace(/\.[^.]+$/, '') || 'photo';
+  var newName = baseName + '.jpg';
+
+  // File-конструктор есть во всех актуальных браузерах. Fallback — на blob
+  try {
+    return new File([blob], newName, { type: 'image/jpeg', lastModified: Date.now() });
+  } catch (e) {
+    blob.name = newName;
+    return blob;
+  }
+}
+
+async function processFile(f, errors) {
+  var isImg = isImageFile(f);
+  var isPdf = isPdfFile(f);
+
+  if (!isImg && !isPdf) {
+    errors.push('«' + f.name + '»: недопустимый формат. Разрешены PDF, JPG, PNG.');
+    return null;
+  }
+
+  if (files.length >= MAX_FILES_COUNT) {
+    errors.push('Уже выбрано максимум ' + MAX_FILES_COUNT + ' файлов.');
+    return null;
+  }
+
+  var finalFile = f;
+
+  if (isImg) {
+    try {
+      finalFile = await compressImage(f);
+    } catch (e) {
+      console.warn('compressImage failed, fallback to original:', e);
+      finalFile = f;
+    }
+  }
+
+  var sizeMb = finalFile.size / (1024 * 1024);
+  if (sizeMb > MAX_FILE_SIZE_MB) {
+    errors.push('«' + f.name + '» (' + humanSize(finalFile.size) + '): больше ' +
+      MAX_FILE_SIZE_MB + ' МБ. Сожмите файл или сделайте фото меньшего размера.');
+    return null;
+  }
+
+  var currentTotal = files.reduce(function (s, x) { return s + (x.size || 0); }, 0);
+  if (currentTotal + finalFile.size > MAX_TOTAL_SIZE_MB * 1024 * 1024) {
+    errors.push('Общий размер файлов превысит ' + MAX_TOTAL_SIZE_MB +
+      ' МБ. Удалите что-то или сожмите файлы.');
+    return null;
+  }
+
+  var dup = files.some(function (x) {
+    return x.name === finalFile.name && x.size === finalFile.size;
+  });
+  if (dup) return null;
+
+  return finalFile;
+}
+
 document.getElementById('uploadBtnLarge').addEventListener('click', function () {
   fileInput.click();
 });
-fileInput.addEventListener('change', function (e) {
+
+fileInput.addEventListener('change', async function (e) {
   var list = Array.prototype.slice.call(e.target.files || []);
-  list.forEach(function (f) {
-    if (files.length >= 5) { alert('Не больше 5 файлов'); return; }
-    files.push(f);
-  });
   e.target.value = '';
+
+  if (!list.length) return;
+
+  var errors = [];
+  var uploadBtn = document.getElementById('uploadBtnLarge');
+  var origText = uploadBtn ? uploadBtn.textContent : '';
+  if (uploadBtn) { uploadBtn.disabled = true; uploadBtn.textContent = 'Обработка файлов...'; }
+
+  try {
+    for (var idx = 0; idx < list.length; idx++) {
+      try {
+        var processed = await processFile(list[idx], errors);
+        if (processed) files.push(processed);
+      } catch (err) {
+        console.warn('processFile error:', err);
+        // Полный fallback: принимаем оригинал, если он в пределах лимитов
+        var raw = list[idx];
+        if (raw && raw.size && raw.size <= MAX_FILE_SIZE_MB * 1024 * 1024) {
+          var curTotal = files.reduce(function (s, x) { return s + (x.size || 0); }, 0);
+          if (curTotal + raw.size <= MAX_TOTAL_SIZE_MB * 1024 * 1024) {
+            files.push(raw);
+          } else {
+            errors.push('«' + raw.name + '»: превышен общий размер');
+          }
+        } else {
+          errors.push('«' + (raw ? raw.name : 'файл') + '»: ошибка обработки');
+        }
+      }
+    }
+  } finally {
+    if (uploadBtn) { uploadBtn.disabled = false; uploadBtn.textContent = origText || '➕ Добавить файлы'; }
+  }
+
   renderFiles();
+  if (errors.length) showFilesErrors(errors);
+  else hideFilesErrors();
 });
+
 function renderFiles() {
   filesList.innerHTML = '';
   files.forEach(function (f, i) {
     var div = document.createElement('div');
     div.className = 'file-item';
     var span = document.createElement('span');
-    span.textContent = f.name;
+    span.textContent = f.name + ' (' + humanSize(f.size) + ')';
     var btn = document.createElement('button');
     btn.type = 'button';
     btn.textContent = '✕';
-    btn.onclick = function () { files.splice(i, 1); renderFiles(); };
+    btn.onclick = function () {
+      files.splice(i, 1);
+      hideFilesErrors();
+      renderFiles();
+    };
     div.appendChild(span); div.appendChild(btn);
     filesList.appendChild(div);
   });
@@ -1171,6 +1356,14 @@ function validate() {
   if (val('inn') && !/^\d{12}$/.test(val('inn'))) { mark('inn', true); errors.push('ИНН: 12 цифр'); }
   if (val('email') && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val('email'))) { mark('email', true); errors.push('Некорректный email'); }
   if (files.length === 0) errors.push('Приложите хотя бы один документ');
+  if (files.length > MAX_FILES_COUNT) errors.push('Не больше ' + MAX_FILES_COUNT + ' файлов');
+
+  var totalSize = files.reduce(function (s, f) { return s + (f.size || 0); }, 0);
+  if (totalSize > MAX_TOTAL_SIZE_MB * 1024 * 1024) {
+    errors.push('Общий размер файлов (' + humanSize(totalSize) + ') превышает ' +
+      MAX_TOTAL_SIZE_MB + ' МБ. Уменьшите размер или количество файлов.');
+  }
+
   if (!document.getElementById('consent').checked) errors.push('Необходимо дать согласие на обработку ПД');
   return errors;
 }
@@ -1274,7 +1467,23 @@ form.addEventListener('submit', async function (e) {
     showStatus('success', '<h2> Анкета отправлена!</h2><p>Ваша анкета успешно передана на обработку. Ожидайте обратной связи.</p>');
   } catch (err) {
     console.error(err);
-    showStatus('error', '<b>Ошибка:</b> ' + (err.message || 'неизвестная'));
+    var msg = (err && err.message) ? String(err.message) : 'неизвестная';
+    var friendly = msg;
+
+    if (/failed to fetch|networkerror|load failed|network request failed|failed to load/i.test(msg)) {
+      friendly = 'Не удалось связаться с сервером. Проверьте интернет и попробуйте снова. ' +
+                 'Если ошибка повторяется — уменьшите размер файлов или напишите в отдел кадров.';
+    } else if (/timeout|timed out/i.test(msg)) {
+      friendly = 'Превышено время ожидания. Возможно, файлы слишком большие или соединение медленное. ' +
+                 'Уменьшите размер файлов и попробуйте снова.';
+    } else if (/413|payload too large|request entity too large/i.test(msg)) {
+      friendly = 'Файлы слишком большие для отправки. Уменьшите размер (суммарно до 15 МБ) и попробуйте снова.';
+    } else if (/crypto|subtle|encrypt|rangeerror|maximum call stack|out of memory/i.test(msg)) {
+      friendly = 'Не удалось обработать файлы (браузер не справился с размером). ' +
+                 'Уменьшите размер файлов или попробуйте открыть ссылку в Chrome / Safari заново.';
+    }
+
+    showStatus('error', '<b>Ошибка отправки:</b><br>' + friendly);
     submitBtn.disabled = false;
     submitBtn.textContent = 'ОТПРАВИТЬ АНКЕТУ';
   }
@@ -1419,19 +1628,33 @@ async function loadPrefill() {
   if (!token) return;
   document.getElementById('candidateId').value = token;
 
+  // ============ own_server: prefill по API ============
+  if (IS_OWN_SERVER) {
+    try {
+      var r = await fetch(OWN_SERVER_PREFILL + '?token=' + encodeURIComponent(token));
+      if (r.status === 404) return;   // первичная — пустая форма, ок
+      if (!r.ok) return;
+      var data = await r.json();
+      if (data.fields) fillAnketa(data.fields);
+      if (data.remarks) showRemarks(data.remarks);
+    } catch (e) {
+      console.error('own_server prefill failed', e);
+    }
+    return;
+  }
+
+  // ============ buffer: prefill из URL-фрагмента ============
   var k = getHashParam('k');
   var i = getHashParam('i');
   var d = getHashParam('d');
 
   if (!k || !i || !d) {
-    // Нет prefill — первичная отправка, пустая форма. Ок.
-    return;
+    return;   // первичная — пустая форма, ок
   }
 
   try {
-    var plainJson = await decryptPayload(d, i, k);
-    // plainJson может быть gzip-сжатым — пробуем распаковать
-    var payload = await parseMaybeGzip(plainJson);
+    var plainBuf = await decryptPayload(d, i, k);
+    var payload = await parseMaybeGzip(plainBuf);
     fillAnketa(payload);
     if (payload._remarks) showRemarks(payload._remarks);
   } catch (e) {
