@@ -19,7 +19,7 @@ os.makedirs(STATIC_FOLDER, exist_ok=True)
 # API-токен для защиты служебных эндпоинтов
 BUFFER_API_TOKEN = os.environ.get(
     'BUFFER_API_TOKEN',
-    'e6auQ1H7ujNYC0Vkj0gazp6O_PACiK7DwMDfA3U3T2LC4YJUIr3izB1_qB35NlB4',
+    'kq3p99kVlqUJDQKqKujggxu5KyJkwGqddJ0bf0enpNj5f4N3A8xk8-SVN60fuhU2',
 )
 
 # Хранилище анкет
